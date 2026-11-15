@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { CalculatedHotelRate, HotelRateCard, RoomConfig } from '../types';
 
-export const HOTEL_RATES_STORAGE_KEY = 'voya_lanka_hotel_rate_cards_v4';
+export const HOTEL_RATES_STORAGE_KEY = 'voya_lanka_hotel_rate_cards_v6';
 
 /**
  * Robust date parser supporting DD.MM.YYYY, DD/MM/YYYY, YYYY-MM-DD
@@ -76,7 +76,7 @@ export function parseDateRange(raw: string | undefined | null): {
   return { label: clean };
 }
 
-// Preloaded sample rate cards matching the user's latest specification & attachment with Rate Valid Dates
+// Preloaded sample rate cards matching the user's latest specification & attachment (image_ed0d62ac.png)
 export const DEFAULT_HOTEL_RATES: HotelRateCard[] = [
   {
     id: 'rate_taj_samudra_period_1',
@@ -103,11 +103,9 @@ export const DEFAULT_HOTEL_RATES: HotelRateCard[] = [
     },
     roomCategoryRates: {
       'Standard Room': 1,
-      'Delux Room': 2,
       'Deluxe Room': 2,
       'Superior Room': 3,
-      'Executive room': 4,
-      'Executive Suite': 4
+      'Executive room': 4
     },
     roomViewRates: {
       'Garden View': 1,
@@ -128,7 +126,7 @@ export const DEFAULT_HOTEL_RATES: HotelRateCard[] = [
     currency: 'USD',
     updatedAt: new Date().toISOString(),
     bedRates: {
-      'Single': 10,
+      'Single': 20,
       'Double (DBL)': 15,
       'DBL + ExtraBed': 20,
       'Twin': 25,
@@ -142,12 +140,10 @@ export const DEFAULT_HOTEL_RATES: HotelRateCard[] = [
       'Full Board': 100
     },
     roomCategoryRates: {
-      'Standard Room': 1,
-      'Delux Room': 2,
-      'Deluxe Room': 2,
-      'Superior Room': 3,
-      'Executive room': 4,
-      'Executive Suite': 4
+      'Standard Room': 100,
+      'Deluxe Room': 150,
+      'Superior Room': 200,
+      'Executive room': 250
     },
     roomViewRates: {
       'Garden View': 1,
@@ -159,83 +155,79 @@ export const DEFAULT_HOTEL_RATES: HotelRateCard[] = [
     }
   },
   {
-    id: 'rate_aliya_resort_period_1',
-    hotelName: 'Aliya Resort & Spa',
+    id: 'rate_taj_samudra_period_3',
+    hotelName: 'Taj Samudra',
     hotelCategory: '5-star',
-    validFrom: '2026-11-01',
-    validTo: '2026-11-20',
-    validDateRangeStr: '01.11.2026-20.11.2026',
+    validFrom: '2027-01-01',
+    validTo: '2027-01-11',
+    validDateRangeStr: '01.01.2027-11.01.2027',
     currency: 'USD',
     updatedAt: new Date().toISOString(),
     bedRates: {
-      'Single': 100,
-      'Double (DBL)': 110,
-      'DBL + ExtraBed': 120,
-      'Twin': 130,
-      'Triple': 140,
-      'Family Suite': 150
+      'Single': 10,
+      'Double (DBL)': 15,
+      'DBL + ExtraBed': 20,
+      'Twin': 25,
+      'Triple': 30,
+      'Family Suite': 40
     },
     mealRates: {
       'Room Only': 0,
-      'Bed & Breakfast': 20,
-      'Half-Board': 40,
-      'Full Board': 80
+      'Bed & Breakfast': 1,
+      'Half-Board': 50,
+      'Full Board': 100
     },
     roomCategoryRates: {
       'Standard Room': 1,
-      'Delux Room': 2,
       'Deluxe Room': 2,
       'Superior Room': 3,
-      'Executive room': 4,
-      'Executive Suite': 4
+      'Executive room': 4
     },
     roomViewRates: {
-      'Garden View': 0,
-      'Sea View': 70,
-      'Mountain View': 20,
-      'City View': 3,
-      'Pool View': 4,
-      'Lagoon View': 5
+      'Garden View': 1,
+      'Sea View': 50,
+      'Mountain View': 3,
+      'City View': 4,
+      'Pool View': 5,
+      'Lagoon View': 6
     }
   },
   {
-    id: 'rate_aliya_resort_period_2',
-    hotelName: 'Aliya Resort & Spa',
+    id: 'rate_taj_samudra_period_4',
+    hotelName: 'Taj Samudra',
     hotelCategory: '5-star',
-    validFrom: '2026-11-21',
-    validTo: '2026-11-30',
-    validDateRangeStr: '21.11.2026-30.11.2026',
+    validFrom: '2027-02-01',
+    validTo: '2027-02-11',
+    validDateRangeStr: '01.02.2027-11.02.2027',
     currency: 'USD',
     updatedAt: new Date().toISOString(),
     bedRates: {
-      'Single': 100,
-      'Double (DBL)': 110,
-      'DBL + ExtraBed': 120,
-      'Twin': 130,
-      'Triple': 140,
-      'Family Suite': 150
+      'Single': 20,
+      'Double (DBL)': 15,
+      'DBL + ExtraBed': 20,
+      'Twin': 25,
+      'Triple': 30,
+      'Family Suite': 40
     },
     mealRates: {
       'Room Only': 0,
-      'Bed & Breakfast': 20,
-      'Half-Board': 40,
-      'Full Board': 80
+      'Bed & Breakfast': 0,
+      'Half-Board': 50,
+      'Full Board': 100
     },
     roomCategoryRates: {
-      'Standard Room': 1,
-      'Delux Room': 2,
-      'Deluxe Room': 2,
-      'Superior Room': 3,
-      'Executive room': 4,
-      'Executive Suite': 4
+      'Standard Room': 100,
+      'Deluxe Room': 150,
+      'Superior Room': 200,
+      'Executive room': 250
     },
     roomViewRates: {
-      'Garden View': 0,
-      'Sea View': 80,
-      'Mountain View': 20,
-      'City View': 3,
-      'Pool View': 4,
-      'Lagoon View': 5
+      'Garden View': 1,
+      'Sea View': 60,
+      'Mountain View': 3,
+      'City View': 4,
+      'Pool View': 5,
+      'Lagoon View': 6
     }
   }
 ];
@@ -355,8 +347,8 @@ export function calculateRoomRate(
     breakdown: {
       bed: { name: room.bedType || 'Not selected', rate: 0 },
       meal: { name: room.meal || 'Not selected', rate: 0 },
-      category: { name: room.roomCategory || 'Standard Room', rate: 0 },
-      view: { name: room.roomView || 'Garden View', rate: 0 }
+      category: { name: room.roomCategory || 'Not selected', rate: 0 },
+      view: { name: room.roomView || 'Not selected', rate: 0 }
     }
   };
 
@@ -365,15 +357,15 @@ export function calculateRoomRate(
   const card = findMatchingHotelRateCard(room.hotel, rateCards, nightDate);
   if (!card) return emptyResult;
 
-  const bedType = room.bedType || 'Double (DBL)';
-  const mealPlan = room.meal || 'Half-Board';
-  const roomCategory = room.roomCategory || 'Standard Room';
-  const roomView = room.roomView || 'Garden View';
+  const bedType = room.bedType || '';
+  const mealPlan = room.meal || '';
+  const roomCategory = room.roomCategory || '';
+  const roomView = room.roomView || '';
 
-  const bedRate = lookupRate(card.bedRates, bedType);
-  const mealRate = lookupRate(card.mealRates, mealPlan);
-  const categoryRate = lookupRate(card.roomCategoryRates, roomCategory);
-  const viewRate = lookupRate(card.roomViewRates, roomView);
+  const bedRate = bedType ? lookupRate(card.bedRates, bedType) : 0;
+  const mealRate = mealPlan ? lookupRate(card.mealRates, mealPlan) : 0;
+  const categoryRate = roomCategory ? lookupRate(card.roomCategoryRates, roomCategory) : 0;
+  const viewRate = roomView ? lookupRate(card.roomViewRates, roomView) : 0;
 
   const isLkr = card.currency === 'LKR';
   const effectiveUsdRate = usdRate || 305;
@@ -409,10 +401,10 @@ export function calculateRoomRate(
     totalUsd,
     totalLkr,
     breakdown: {
-      bed: { name: bedType, rate: bedRate },
-      meal: { name: mealPlan, rate: mealRate },
-      category: { name: roomCategory, rate: categoryRate },
-      view: { name: roomView, rate: viewRate }
+      bed: { name: bedType || 'Not selected', rate: bedRate },
+      meal: { name: mealPlan || 'Not selected', rate: mealRate },
+      category: { name: roomCategory || 'Not selected', rate: categoryRate },
+      view: { name: roomView || 'Not selected', rate: viewRate }
     }
   };
 }
@@ -438,6 +430,23 @@ export async function parseHotelRatesExcel(
     header: 1,
     defval: ''
   });
+
+  // Expand merged cells so merged Hotel Name / Hotel Category headers populate every covered column
+  const merges = worksheet['!merges'] || [];
+  for (const merge of merges) {
+    const topLeftVal = rawRows[merge.s.r]?.[merge.s.c];
+    if (topLeftVal !== undefined && topLeftVal !== null && String(topLeftVal).trim() !== '') {
+      for (let mr = merge.s.r; mr <= merge.e.r; mr++) {
+        if (!rawRows[mr]) continue;
+        for (let mc = merge.s.c; mc <= merge.e.c; mc++) {
+          const existingCell = rawRows[mr][mc];
+          if (existingCell === undefined || existingCell === null || String(existingCell).trim() === '') {
+            rawRows[mr][mc] = topLeftVal;
+          }
+        }
+      }
+    }
+  }
 
   if (!rawRows || rawRows.length < 3) {
     throw new Error(
@@ -484,7 +493,30 @@ function parseMatrixFormat(
   warnings: string[]
 ): { rateCards: HotelRateCard[]; warnings: string[] } {
   const hotelRow = rows[hotelRowIdx];
-  const totalCols = hotelRow.length;
+  const totalCols = Math.max(...rows.slice(0, Math.min(rows.length, 6)).map(r => r?.length || 0), hotelRow.length);
+
+  // Locate header metadata rows (Rate Valid date and Hotel Category can appear above or below Hotel Name)
+  let validDateRowIdx = -1;
+  let categoryRowIdx = -1;
+  const headerScanLimit = Math.min(rows.length, Math.max(hotelRowIdx + 5, 6));
+
+  for (let r = 0; r < headerScanLimit; r++) {
+    if (r === hotelRowIdx) continue;
+    const firstCell = String(rows[r]?.[0] || '').toLowerCase().trim();
+    if (
+      validDateRowIdx === -1 &&
+      (firstCell.includes('valid') || firstCell.includes('date') ||
+        rows[r]?.slice(1).some(cell => String(cell || '').match(/\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/)))
+    ) {
+      validDateRowIdx = r;
+    }
+    if (
+      categoryRowIdx === -1 &&
+      (firstCell.includes('hotel category') || firstCell === 'category' || firstCell.includes('star'))
+    ) {
+      categoryRowIdx = r;
+    }
+  }
 
   const hotels: {
     colIdx: number;
@@ -495,11 +527,24 @@ function parseMatrixFormat(
     validTo?: string;
   }[] = [];
 
-  // Find all hotel columns
+  // Find all hotel columns, propagating horizontally if a hotel cell spans multiple date columns
+  let lastHotelName = '';
   for (let c = 1; c < totalCols; c++) {
-    const val = String(hotelRow[c] || '').trim();
-    if (val) {
-      hotels.push({ colIdx: c, name: val });
+    const rawName = String(hotelRow[c] || '').trim();
+    if (rawName) {
+      lastHotelName = rawName;
+    }
+
+    const hasDateInCol = validDateRowIdx !== -1 && String(rows[validDateRowIdx]?.[c] || '').trim() !== '';
+    const hasCatInCol = categoryRowIdx !== -1 && String(rows[categoryRowIdx]?.[c] || '').trim() !== '';
+    const hasDataInCol = rows.slice(hotelRowIdx + 1).some(r => {
+      const v = r?.[c];
+      return v !== undefined && v !== null && String(v).trim() !== '';
+    });
+
+    const resolvedName = rawName || ((hasDateInCol || hasCatInCol || hasDataInCol) ? lastHotelName : '');
+    if (resolvedName) {
+      hotels.push({ colIdx: c, name: resolvedName });
     }
   }
 
@@ -509,19 +554,20 @@ function parseMatrixFormat(
     );
   }
 
-  // Look for "Rate Valid date" or date ranges in the rows above or immediately below Hotel Name
-  // In the user's screenshot:
-  // Row 0 has "Rate Valid date"
-  // Row 1 has "01.11.2026-11.11.2026", "12.11.2026-20.11.2026", etc.
-  // Row 2 has "Hotel Name"
+  // Extract Rate Valid dates and Hotel Categories for each column
   for (const h of hotels) {
-    // Check rows above hotelRowIdx
-    for (let r = 0; r < hotelRowIdx; r++) {
+    // Search all header rows around hotelRowIdx (above and below) for valid date range
+    for (let r = 0; r < headerScanLimit; r++) {
+      if (r === hotelRowIdx) continue;
       const cellVal = String(rows[r]?.[h.colIdx] || '').trim();
       const firstCell = String(rows[r]?.[0] || '').toLowerCase().trim();
 
-      // If cell looks like a date range or row label indicates valid date
-      if (cellVal && (firstCell.includes('valid') || firstCell.includes('date') || cellVal.match(/\d{1,2}[./-]\d{1,2}/))) {
+      if (
+        cellVal &&
+        (firstCell.includes('valid') ||
+          firstCell.includes('date') ||
+          cellVal.match(/\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/))
+      ) {
         const parsedRange = parseDateRange(cellVal);
         if (parsedRange && (parsedRange.validFrom || parsedRange.validTo)) {
           h.validDateRangeStr = parsedRange.label;
@@ -532,29 +578,11 @@ function parseMatrixFormat(
       }
     }
 
-    // If not found above, check 1 row below hotelRowIdx (in case dates are below)
-    if (!h.validFrom && rows[hotelRowIdx + 1]) {
-      const firstCell = String(rows[hotelRowIdx + 1]?.[0] || '').toLowerCase().trim();
-      if (firstCell.includes('valid') || firstCell.includes('date')) {
-        const cellVal = String(rows[hotelRowIdx + 1]?.[h.colIdx] || '').trim();
-        const parsedRange = parseDateRange(cellVal);
-        if (parsedRange) {
-          h.validDateRangeStr = parsedRange.label;
-          h.validFrom = parsedRange.validFrom;
-          h.validTo = parsedRange.validTo;
-        }
+    if (categoryRowIdx !== -1) {
+      const catVal = String(rows[categoryRowIdx]?.[h.colIdx] || '').trim();
+      if (catVal) {
+        h.category = catVal;
       }
-    }
-  }
-
-  // Inspect optional category row (usually below Hotel Name, e.g. "Hotel Category")
-  for (let r = hotelRowIdx + 1; r < Math.min(rows.length, hotelRowIdx + 3); r++) {
-    const firstCell = String(rows[r]?.[0] || '').toLowerCase();
-    if (firstCell.includes('hotel category') || firstCell.includes('category') || firstCell.includes('star')) {
-      for (const h of hotels) {
-        h.category = String(rows[r]?.[h.colIdx] || '').trim();
-      }
-      break;
     }
   }
 
@@ -571,7 +599,7 @@ function parseMatrixFormat(
     rateCardsMap.set(h.colIdx, {
       id: cardId,
       hotelName: h.name,
-      hotelCategory: h.category || '5-star',
+      hotelCategory: h.category || '',
       validFrom: h.validFrom,
       validTo: h.validTo,
       validDateRangeStr: h.validDateRangeStr,
@@ -586,7 +614,7 @@ function parseMatrixFormat(
 
   // State machine for sections in Column A
   type Section = 'occupancy' | 'meal' | 'roomCategory' | 'roomView' | 'other';
-  let currentSection: Section = 'occupancy';
+  let currentSection: Section = 'other';
 
   const startRow = hotelRowIdx + 1;
   for (let r = startRow; r < rows.length; r++) {
@@ -596,30 +624,48 @@ function parseMatrixFormat(
 
     const lowerLabel = rawLabel.toLowerCase();
 
-    // Check for section header transitions
+    // Check for section header transitions (use exact/specific header matches so item rows like "Garden View" or "Sea View" are never skipped)
     if (
-      lowerLabel.includes('occupancy') ||
-      lowerLabel.includes('bed type') ||
-      lowerLabel.includes('occupancy / bed')
+      lowerLabel === 'occupancy' ||
+      lowerLabel === 'occupancy / bed' ||
+      lowerLabel === 'occupancy/bed' ||
+      lowerLabel === 'bed type' ||
+      lowerLabel === 'bed types' ||
+      lowerLabel.includes('occupancy')
     ) {
       currentSection = 'occupancy';
       continue;
     }
-    if (lowerLabel.includes('meal plan') || lowerLabel === 'meals' || lowerLabel === 'meal') {
+    if (
+      lowerLabel === 'meal plan' ||
+      lowerLabel === 'meal plans' ||
+      lowerLabel === 'meals' ||
+      lowerLabel === 'meal'
+    ) {
       currentSection = 'meal';
       continue;
     }
-    if (lowerLabel.includes('room category') || lowerLabel.includes('room type')) {
+    if (
+      lowerLabel === 'room category' ||
+      lowerLabel === 'room categories' ||
+      lowerLabel === 'room type' ||
+      lowerLabel === 'room types'
+    ) {
       currentSection = 'roomCategory';
       continue;
     }
-    if (lowerLabel.includes('room view') || lowerLabel.includes('view')) {
+    if (
+      lowerLabel === 'room view' ||
+      lowerLabel === 'room views' ||
+      lowerLabel === 'view' ||
+      lowerLabel === 'views'
+    ) {
       currentSection = 'roomView';
       continue;
     }
     if (
-      lowerLabel.includes('hotel category') ||
-      lowerLabel.includes('category') ||
+      lowerLabel === 'hotel category' ||
+      lowerLabel === 'category' ||
       lowerLabel.includes('rate valid') ||
       lowerLabel.includes('valid date')
     ) {
@@ -741,48 +787,52 @@ function parseTabularFormat(
 }
 
 /**
- * Generate a downloadable Excel workbook matching the exact structure from the user's latest screenshot
- * Row 1: Rate Valid date
- * Row 2: Date ranges (01.11.2026-11.11.2026, 12.11.2026-20.11.2026, etc.)
- * Row 3: Hotel Name (Taj Samudra, Taj Samudra, Aliya Resort & Spa, Aliya Resort & Spa)
- * Row 4: Hotel Category (5-star, 5-star, 5-star, 5-star)
- * Row 5+: Occupancy / Bed, Meal Plan, Room Category, Room View
+ * Generate a downloadable Excel workbook matching the exact structure from image_ed0d62ac.png:
+ * Row 1: Hotel Name (merged across date columns per hotel)
+ * Row 2: Rate Valid date (01.11.2026-11.11.2026, 12.11.2026-20.11.2026, 01.01.2027-11.01.2027, 01.02.2027-11.02.2027)
+ * Row 3: Hotel Category (5-star)
+ * Row 4+: Occupancy / Bed, Meal Plan, Room Category, Room View
  */
 export function generateSampleHotelRatesWorkbook(): Uint8Array {
   const wb = XLSX.utils.book_new();
 
   const data = [
-    ['', 'Rate Valid date', 'Rate Valid date', 'Rate Valid date', 'Rate Valid date'],
-    ['', '01.11.2026-11.11.2026', '12.11.2026-20.11.2026', '01.11.2026-20.11.2026', '21.11.2026-30.11.2026'],
-    ['Hotel Name', 'Taj Samudra', 'Taj Samudra', 'Aliya Resort & Spa', 'Aliya Resort & Spa'],
+    ['Hotel Name', 'Taj Samudra', '', 'Taj Samudra', ''],
+    ['Rate Valid date', '01.11.2026-11.11.2026', '12.11.2026-20.11.2026', '01.01.2027-11.01.2027', '01.02.2027-11.02.2027'],
     ['Hotel Category', '5-star', '5-star', '5-star', '5-star'],
     ['Occupancy / Bed', '', '', '', ''],
-    ['Single', 10, 10, 100, 100],
-    ['Double (DBL)', 15, 15, 110, 110],
-    ['DBL + ExtraBed', 20, 20, 120, 120],
-    ['Twin', 25, 25, 130, 130],
-    ['Triple', 30, 30, 140, 140],
-    ['Family Suite', 40, 40, 150, 150],
+    ['Single', 10, 20, 10, 20],
+    ['Double (DBL)', 15, 15, 15, 15],
+    ['DBL + ExtraBed', 20, 20, 20, 20],
+    ['Twin', 25, 25, 25, 25],
+    ['Triple', 30, 30, 30, 30],
+    ['Family Suite', 40, 40, 40, 40],
     ['Meal Plan', '', '', '', ''],
-    ['Room Only', 0, '', '', ''],
-    ['Bed & Breakfast', 1, '', 20, 20],
-    ['Half-Board', 50, 50, 40, 40],
-    ['Full Board', 100, 100, 80, 80],
+    ['Room Only', 0, '', 0, ''],
+    ['Bed & Breakfast', 1, '', 1, ''],
+    ['Half-Board', 50, 50, 50, 50],
+    ['Full Board', 100, 100, 100, 100],
     ['Room Category', '', '', '', ''],
-    ['Standard Room', 1, 1, 1, 1],
-    ['Delux Room', 2, 2, 2, 2],
-    ['Superior Room', 3, 3, 3, 3],
-    ['Executive room', 4, 4, 4, 4],
+    ['Standard Room', 1, 100, 1, 100],
+    ['Deluxe Room', 2, 150, 2, 150],
+    ['Superior Room', 3, 200, 3, 200],
+    ['Executive room', 4, 250, 4, 250],
     ['Room View', '', '', '', ''],
-    ['Garden View', 1, 1, '', ''],
-    ['Sea View', 50, 60, 70, 80],
-    ['Mountain View', 3, 3, 20, 20],
-    ['City View', 4, 4, 3, 3],
-    ['Pool View', 5, 5, 4, 4],
-    ['Lagoon View', 6, 6, 5, 5]
+    ['Garden View', 1, 1, 1, 1],
+    ['Sea View', 50, 60, 50, 60],
+    ['Mountain View', 3, 3, 3, 3],
+    ['City View', 4, 4, 4, 4],
+    ['Pool View', 5, 5, 5, 5],
+    ['Lagoon View', 6, 6, 6, 6]
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Merge Hotel Name cells across their respective date period columns
+  ws['!merges'] = [
+    { s: { r: 0, c: 1 }, e: { r: 0, c: 2 } },
+    { s: { r: 0, c: 3 }, e: { r: 0, c: 4 } }
+  ];
 
   // Set column widths
   ws['!cols'] = [

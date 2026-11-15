@@ -88,9 +88,9 @@ create table if not exists public.company_settings (
 
 alter table public.company_settings enable row level security;
 
-create policy "All authenticated staff can view company settings"
+create policy "Anyone can view company branding and logo"
   on public.company_settings for select
-  using (auth.role() = 'authenticated');
+  using (true);
 
 create policy "Only Admins can insert or update company settings"
   on public.company_settings for all

@@ -110,7 +110,7 @@ export const HotelRatesModal: React.FC<HotelRatesModalProps> = ({
     onRateCardsChange(DEFAULT_HOTEL_RATES);
     saveHotelRatesToLocal(DEFAULT_HOTEL_RATES);
     setSelectedHotelIndex(0);
-    setUploadSuccess('Restored sample hotel rates (Taj Samudra & Aliya Resort & Spa).');
+    setUploadSuccess('Restored sample hotel rates (Taj Samudra - 4 validity periods).');
     showToast('Sample hotel rates restored!');
   };
 
@@ -273,8 +273,7 @@ export const HotelRatesModal: React.FC<HotelRatesModalProps> = ({
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   Need a starting point? Download our pre-formatted template or reload sample rates
-                  for <b className="text-slate-300">Taj Samudra</b> &amp;{' '}
-                  <b className="text-slate-300">Aliya Resort &amp; Spa</b>.
+                  for <b className="text-slate-300">Taj Samudra</b> (with merged hotel headers &amp; date periods).
                 </p>
               </div>
 
@@ -371,9 +370,11 @@ export const HotelRatesModal: React.FC<HotelRatesModalProps> = ({
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-base font-bold text-white flex items-center gap-2">
                         <span>{currentHotel.hotelName}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-sky-950/80 border border-sky-700/60 text-sky-300 font-semibold">
-                          {currentHotel.hotelCategory || '5-star'}
-                        </span>
+                        {currentHotel.hotelCategory && (
+                          <span className="text-xs px-2 py-0.5 rounded-md bg-sky-950/80 border border-sky-700/60 text-sky-300 font-semibold">
+                            {currentHotel.hotelCategory}
+                          </span>
+                        )}
                       </h4>
                       {currentHotel.validDateRangeStr && (
                         <span className="text-xs px-2.5 py-0.5 rounded-lg bg-amber-950/80 border border-amber-600/60 text-amber-300 font-semibold flex items-center gap-1.5 shadow-sm">

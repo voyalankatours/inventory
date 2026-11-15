@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bookmark, BookmarkCheck, MessageCircle, RefreshCw, UserCheck, Users } from 'lucide-react';
 import { CustomerDetails } from '../types';
+import { TravelDatePicker } from './TravelDatePicker';
 
 interface CustomerSectionProps {
   customer: CustomerDetails;
@@ -215,11 +216,9 @@ export const CustomerSection: React.FC<CustomerSectionProps> = ({
           <label className="block text-xs font-medium text-slate-400 mb-1">
             Travel Arrival Date
           </label>
-          <input
-            type="date"
+          <TravelDatePicker
             value={customer.travelDate}
-            onChange={e => onCustomerChange({ travelDate: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500 transition-colors"
+            onChange={travelDate => onCustomerChange({ travelDate })}
           />
         </div>
 

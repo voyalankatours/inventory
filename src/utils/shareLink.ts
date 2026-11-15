@@ -7,10 +7,12 @@ import { formatLKR, formatUSD, numberToWords } from './calc';
  */
 export function generateShareableLink(quoteData: ShareableQuotationData): string {
   try {
-    // Strip heavy base64 logo if too large to keep link compact, or keep if small
+    // Strip heavy base64 logo only if very large (> 90KB) to keep link compact
+    const keepLogo = !quoteData.logoUrl || quoteData.logoUrl.length <= 90000;
     const dataToEncode: ShareableQuotationData = {
       ...quoteData,
-      logoUrl: quoteData.logoUrl && quoteData.logoUrl.length > 50000 ? undefined : quoteData.logoUrl
+      logoUrl: keepLogo ? quoteData.logoUrl : undefined,
+      logoMeta: keepLogo ? quoteData.logoMeta : undefined
     };
 
     const jsonString = JSON.stringify(dataToEncode);

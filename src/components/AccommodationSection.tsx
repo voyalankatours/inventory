@@ -16,7 +16,6 @@ import {
 import {
   BED_TYPES,
   HOTEL_CATEGORIES,
-  HOTELS,
   HotelRateCard,
   MEAL_PLANS,
   NightConfig,
@@ -104,13 +103,18 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
       const updatedRooms = night.rooms.map(room => {
         if (!room.hotel) return room;
         const calc = calculateRoomRate(room, rateCards, usdRate, nightDate);
-        if (calc.hotelMatched && calc.totalUsd > 0 && calc.totalUsd !== room.costUsd) {
-          hasChanges = true;
-          return {
-            ...room,
-            costUsd: calc.totalUsd,
-            cost: calc.totalLkr
-          };
+        if (calc.hotelMatched) {
+          const nextCat = calc.rateCard?.hotelCategory || room.category;
+          const priceChanged = calc.totalUsd > 0 && calc.totalUsd !== room.costUsd;
+          const catChanged = Boolean(nextCat && nextCat !== room.category);
+          if (priceChanged || catChanged) {
+            hasChanges = true;
+            return {
+              ...room,
+              category: nextCat,
+              ...(calc.totalUsd > 0 ? { costUsd: calc.totalUsd, cost: calc.totalLkr } : {})
+            };
+          }
         }
         return room;
       });
@@ -119,7 +123,7 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
 
     if (hasChanges) {
       onNightsChange(updated);
-      showToast(`Hotel prices automatically updated for travel date (${travelDate})!`);
+      showToast(`Hotel rates & categories updated for travel date (${travelDate})!`);
     }
   }, [travelDate, rateCards, usdRate]);
 
@@ -149,9 +153,23 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
     ) {
       const nightDate = getNightDateObject(targetNight.nightNumber || nightIdx + 1);
       const calc = calculateRoomRate(candidateRoom, rateCards, usdRate, nightDate);
-      if (calc.hotelMatched && calc.totalUsd > 0) {
-        fields.costUsd = calc.totalUsd;
-        fields.cost = calc.totalLkr;
+      if (calc.hotelMatched) {
+        if (calc.rateCard?.hotelCategory && (fields.hotel !== undefined || !currentRoom.category)) {
+          fields.category = calc.rateCard.hotelCategory;
+        }
+        if (calc.totalUsd > 0) {
+          fields.costUsd = calc.totalUsd;
+          fields.cost = calc.totalLkr;
+        } else if (
+          calc.totalUsd === 0 &&
+          !candidateRoom.bedType &&
+          !candidateRoom.meal &&
+          !candidateRoom.roomCategory &&
+          !candidateRoom.roomView
+        ) {
+          fields.costUsd = 0;
+          fields.cost = 0;
+        }
       }
     }
 
@@ -175,12 +193,12 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
         rooms: night.rooms.map(room => {
           if (!room.hotel) return room;
           const calc = calculateRoomRate(room, rateCards, usdRate, nightDate);
-          if (calc.hotelMatched && calc.totalUsd > 0) {
-            pricedCount++;
+          if (calc.hotelMatched) {
+            if (calc.totalUsd > 0) pricedCount++;
             return {
               ...room,
-              costUsd: calc.totalUsd,
-              cost: calc.totalLkr
+              category: calc.rateCard?.hotelCategory || room.category,
+              ...(calc.totalUsd > 0 ? { costUsd: calc.totalUsd, cost: calc.totalLkr } : {})
             };
           }
           return room;
@@ -190,7 +208,7 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
 
     onNightsChange(updated);
     if (pricedCount > 0) {
-      showToast(`Auto-priced ${pricedCount} room(s) according to their night validity dates!`);
+      showToast(`Auto-priced ${pricedCount} room(s) and synced hotel categories from Excel!`);
     } else {
       showToast('No matching hotels found in rate cards for current nights.');
     }
@@ -226,26 +244,17 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
   const handleAddRoom = (nightIdx: number) => {
     const updated = [...nights];
     const targetNight = { ...updated[nightIdx] };
-    const fallbackHotel = HOTELS[nightIdx % HOTELS.length];
     const newRoom: RoomConfig = {
       id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-      hotel: fallbackHotel,
-      category: '4-Star Premium',
-      meal: 'Half-Board',
-      bedType: 'Double (DBL)',
-      roomCategory: 'Standard Room',
-      roomView: 'Garden View',
-      cost: 28000
+      hotel: '',
+      category: '',
+      meal: '',
+      bedType: '',
+      roomCategory: '',
+      roomView: '',
+      cost: 0,
+      costUsd: 0
     };
-
-    if (rateCards && rateCards.length > 0) {
-      const nightDate = getNightDateObject(targetNight.nightNumber || nightIdx + 1);
-      const calc = calculateRoomRate(newRoom, rateCards, usdRate, nightDate);
-      if (calc.hotelMatched && calc.totalUsd > 0) {
-        newRoom.costUsd = calc.totalUsd;
-        newRoom.cost = calc.totalLkr;
-      }
-    }
 
     targetNight.rooms = [...targetNight.rooms, newRoom];
     updated[nightIdx] = targetNight;
@@ -283,12 +292,13 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
     const newNight: RoomConfig = {
       id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       hotel: '',
-      category: '4-Star Premium',
-      meal: 'Half-Board',
-      bedType: 'Double (DBL)',
-      roomCategory: 'Standard Room',
-      roomView: 'Garden View',
-      cost: 0
+      category: '',
+      meal: '',
+      bedType: '',
+      roomCategory: '',
+      roomView: '',
+      cost: 0,
+      costUsd: 0
     };
     const newNightsList = [
       ...nights,
@@ -543,6 +553,7 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
                           </label>
                           <HotelAutocomplete
                             value={room.hotel}
+                            rateCards={rateCards}
                             onChange={(hotel, category) =>
                               handleRoomChange(nightIdx, roomIdx, {
                                 hotel,
@@ -556,19 +567,38 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
                           <label className="block text-[11px] font-medium text-slate-400 mb-1">
                             Hotel Category
                           </label>
-                          <select
-                            value={room.category}
-                            onChange={e =>
-                              handleRoomChange(nightIdx, roomIdx, { category: e.target.value })
+                          {(() => {
+                            const categoryOpts = [...HOTEL_CATEGORIES];
+                            const seen = new Set(categoryOpts.map(c => c.toLowerCase()));
+                            (rateCards || []).forEach(rc => {
+                              const cat = (rc.hotelCategory || '').trim();
+                              if (cat && !seen.has(cat.toLowerCase())) {
+                                seen.add(cat.toLowerCase());
+                                categoryOpts.unshift(cat);
+                              }
+                            });
+                            if (room.category && !seen.has(room.category.toLowerCase())) {
+                              categoryOpts.unshift(room.category);
                             }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500 transition-colors"
-                          >
-                            {HOTEL_CATEGORIES.map(cat => (
-                              <option key={cat} value={cat}>
-                                {cat}
-                              </option>
-                            ))}
-                          </select>
+                            return (
+                              <select
+                                value={room.category}
+                                onChange={e =>
+                                  handleRoomChange(nightIdx, roomIdx, { category: e.target.value })
+                                }
+                                className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-500 transition-colors ${
+                                  room.category ? 'text-slate-100' : 'text-slate-500'
+                                }`}
+                              >
+                                <option value="">Select category...</option>
+                                {categoryOpts.map(cat => (
+                                  <option key={cat} value={cat} className="text-slate-100">
+                                    {cat}
+                                  </option>
+                                ))}
+                              </select>
+                            );
+                          })()}
                         </div>
 
                         <div>
@@ -580,10 +610,13 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
                             onChange={e =>
                               handleRoomChange(nightIdx, roomIdx, { meal: e.target.value })
                             }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500 transition-colors"
+                            className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-500 transition-colors ${
+                              room.meal ? 'text-slate-100' : 'text-slate-500'
+                            }`}
                           >
+                            <option value="">Select meal plan...</option>
                             {MEAL_PLANS.map(m => (
-                              <option key={m} value={m}>
+                              <option key={m} value={m} className="text-slate-100">
                                 {m}
                               </option>
                             ))}
@@ -599,10 +632,13 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
                             onChange={e =>
                               handleRoomChange(nightIdx, roomIdx, { bedType: e.target.value })
                             }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500 transition-colors"
+                            className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-500 transition-colors ${
+                              room.bedType ? 'text-slate-100' : 'text-slate-500'
+                            }`}
                           >
+                            <option value="">Select bed / occupancy...</option>
                             {BED_TYPES.map(b => (
-                              <option key={b} value={b}>
+                              <option key={b} value={b} className="text-slate-100">
                                 {b}
                               </option>
                             ))}
@@ -621,10 +657,13 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
                             onChange={e =>
                               handleRoomChange(nightIdx, roomIdx, { roomCategory: e.target.value })
                             }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500 transition-colors"
+                            className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-500 transition-colors ${
+                              room.roomCategory ? 'text-slate-100' : 'text-slate-500'
+                            }`}
                           >
+                            <option value="">Select room category...</option>
                             {ROOM_CATEGORIES.map(rc => (
-                              <option key={rc} value={rc}>
+                              <option key={rc} value={rc} className="text-slate-100">
                                 {rc}
                               </option>
                             ))}
@@ -640,10 +679,13 @@ export const AccommodationSection: React.FC<AccommodationSectionProps> = ({
                             onChange={e =>
                               handleRoomChange(nightIdx, roomIdx, { roomView: e.target.value })
                             }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500 transition-colors"
+                            className={`w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-sky-500 transition-colors ${
+                              room.roomView ? 'text-slate-100' : 'text-slate-500'
+                            }`}
                           >
+                            <option value="">Select room view...</option>
                             {ROOM_VIEWS.map(rv => (
-                              <option key={rv} value={rv}>
+                              <option key={rv} value={rv} className="text-slate-100">
                                 {rv}
                               </option>
                             ))}

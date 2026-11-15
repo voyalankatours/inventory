@@ -237,6 +237,7 @@ export interface SharedCompanySettings {
   company: CompanyDetails;
   terms: TermsConfig;
   logo: LogoData | null;
+  fromCloud?: boolean;
 }
 
 export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
@@ -244,7 +245,8 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
     return {
       company: DEFAULT_COMPANY,
       terms: DEFAULT_TERMS,
-      logo: null
+      logo: null,
+      fromCloud: false
     };
   }
 
@@ -257,12 +259,12 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
 
     if (error) {
       console.warn('Error fetching company settings:', error.message);
-      return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null };
+      return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null, fromCloud: false };
     }
 
     if (!data) {
       // First-time initialization of singleton row
-      return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null };
+      return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null, fromCloud: false };
     }
 
     const company: CompanyDetails = {
@@ -277,11 +279,18 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
     let logo: LogoData | null = null;
     if (data.logo_data) {
       try {
-        logo = typeof data.logo_data === 'string' && data.logo_data.startsWith('{')
+        const parsed = typeof data.logo_data === 'string' && data.logo_data.trim().startsWith('{')
           ? JSON.parse(data.logo_data)
           : { data: data.logo_data, w: 200, h: 80 };
+        if (parsed && parsed.data) {
+          logo = {
+            data: parsed.data,
+            w: Number(parsed.w) || 200,
+            h: Number(parsed.h) || 80
+          };
+        }
       } catch (_) {
-        logo = { data: data.logo_data, w: 200, h: 80 };
+        logo = { data: String(data.logo_data), w: 200, h: 80 };
       }
     }
 
@@ -289,10 +298,10 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
       ? { ...DEFAULT_TERMS, ...data.terms_config }
       : DEFAULT_TERMS;
 
-    return { company, terms, logo };
+    return { company, terms, logo, fromCloud: true };
   } catch (err) {
     console.error('Failed to load company settings from Supabase:', err);
-    return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null };
+    return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null, fromCloud: false };
   }
 }
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AccommodationSection } from './components/AccommodationSection';
 import { ActivityLogsModal } from './components/ActivityLogsModal';
 import { AuthModal } from './components/AuthModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { ChargesSection } from './components/ChargesSection';
 import { CompanyModal } from './components/CompanyModal';
 import { CustomerDatabaseModal } from './components/CustomerDatabaseModal';
@@ -34,7 +35,6 @@ import {
   DEFAULT_COMPANY,
   DEFAULT_TERMS,
   GuideDetails,
-  HOTELS,
   HotelRateCard,
   IT_CLOSE,
   IT_GREET,
@@ -73,6 +73,7 @@ import {
 import { buildExcelWorkbookBlob } from './utils/excelExport';
 import {
   downloadBlob,
+  formatGeneratedByLabel,
   generateItineraryPDF,
   generateQuotationPDF,
   generateVoucherPDF,
@@ -112,13 +113,14 @@ export function createDefaultNights(count: number, existing?: NightConfig[]): Ni
         rooms: [
           {
             id: 'r_' + (i + 1) + '_' + Math.random().toString(36).substr(2, 4),
-            hotel: HOTELS[i % HOTELS.length],
-            category: '4-Star Premium',
-            meal: 'Half-Board',
-            bedType: 'Double (DBL)',
-            roomCategory: 'Standard Room',
-            roomView: 'Garden View',
-            cost: 28000
+            hotel: '',
+            category: '',
+            meal: '',
+            bedType: '',
+            roomCategory: '',
+            roomView: '',
+            cost: 0,
+            costUsd: 0
           }
         ]
       });
@@ -251,6 +253,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>('connected');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isActivityLogsOpen, setIsActivityLogsOpen] = useState(false);
   const [isPasswordRecoveryOpen, setIsPasswordRecoveryOpen] = useState(false);
   const [isHotelRatesModalOpen, setIsHotelRatesModalOpen] = useState(false);
@@ -308,10 +311,13 @@ export default function App() {
       ]);
       setSavedQuotes(cloudQuotes);
       setCustomers(cloudCusts);
-      if (cloudSettings) {
+      if (cloudSettings && cloudSettings.fromCloud) {
         setCompany(cloudSettings.company);
+        saveCompanyDetails(cloudSettings.company);
         setTerms(cloudSettings.terms);
-        if (cloudSettings.logo) setLogo(cloudSettings.logo);
+        saveTermsConfig(cloudSettings.terms);
+        setLogo(cloudSettings.logo);
+        saveLogo(cloudSettings.logo);
       }
       setSyncStatus('connected');
     } catch (err) {
@@ -437,9 +443,14 @@ export default function App() {
       },
       onCompanySettingsChange: async () => {
         const cs = await fetchCompanySettings();
-        setCompany(cs.company);
-        setTerms(cs.terms);
-        if (cs.logo) setLogo(cs.logo);
+        if (cs.fromCloud) {
+          setCompany(cs.company);
+          saveCompanyDetails(cs.company);
+          setTerms(cs.terms);
+          saveTermsConfig(cs.terms);
+          setLogo(cs.logo);
+          saveLogo(cs.logo);
+        }
       }
     });
 
@@ -493,6 +504,20 @@ export default function App() {
 
       const storedTerms = loadTermsConfig();
       setTerms(storedTerms);
+
+      // Also attempt to fetch shared company settings (including logo) on startup so Login & Shared links stay in sync
+      if (isSupabaseConfigured()) {
+        fetchCompanySettings().then(cs => {
+          if (cs.fromCloud) {
+            setCompany(cs.company);
+            saveCompanyDetails(cs.company);
+            setTerms(cs.terms);
+            saveTermsConfig(cs.terms);
+            setLogo(cs.logo);
+            saveLogo(cs.logo);
+          }
+        }).catch(() => {});
+      }
 
       // Per requirement: default app mode on launch is empty fillable details.
       // Saved quotations can be loaded anytime from the Saved Quotes repository.
@@ -550,9 +575,11 @@ export default function App() {
       itinerary,
       breakdown,
       company,
-      logoUrl: logo?.data
+      logoUrl: logo?.data,
+      logoMeta: logo ? { w: logo.w, h: logo.h } : undefined,
+      generatedBy: formatGeneratedByLabel(currentUser) || undefined
     };
-  }, [customer, pax, transport, guide, pricing, others, nights, terms, itinerary, breakdown, company, logo]);
+  }, [customer, pax, transport, guide, pricing, others, nights, terms, itinerary, breakdown, company, logo, currentUser]);
 
   // Template variables for terms
   const templateVars = useMemo(() => {
@@ -1083,7 +1110,8 @@ export default function App() {
         terms,
         pricingBreakdown: breakdown,
         company,
-        logo
+        logo,
+        generatedBy: formatGeneratedByLabel(currentUser)
       };
       const blob = generateQuotationPDF(exportData);
       const filename = `Voya_Lanka_Quotation_${customer.qno || 'Draft'}.pdf`;
@@ -1172,7 +1200,8 @@ export default function App() {
         company,
         confirmedBy,
         logo,
-        pricing.usdRate || 305
+        pricing.usdRate || 305,
+        formatGeneratedByLabel(currentUser)
       );
 
       const filename = `Voya_Lanka_Room_Voucher_Nights_${nightNumbers.join('_')}_${customer.qno || 'Draft'}.pdf`;
@@ -1229,7 +1258,8 @@ export default function App() {
         terms,
         pricingBreakdown: breakdown,
         company,
-        logo
+        logo,
+        generatedBy: formatGeneratedByLabel(currentUser)
       };
       const blob = generateItineraryPDF(itinerary, exportData);
       const filename = `Voya_Lanka_Itinerary_${customer.qno || 'Draft'}.pdf`;
@@ -1286,6 +1316,7 @@ export default function App() {
     return (
       <OnlineProposalView
         data={sharedProposalData}
+        fallbackLogo={logo}
         onBackToEditor={() => {
           setSharedProposalData(null);
           if (window.location.hash.includes('quote=')) {
@@ -1335,6 +1366,7 @@ export default function App() {
     return (
       <OnlineProposalView
         data={currentShareableData}
+        fallbackLogo={logo}
         onBackToEditor={() => setIsPreviewProposalOpen(false)}
         showToast={showToast}
       />
@@ -1354,6 +1386,7 @@ export default function App() {
         onOpenHotelRates={() => setIsHotelRatesModalOpen(true)}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onSignOut={handleSignOut}
+        onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         onOpenUserManagement={() => setIsUserManagementOpen(true)}
         onOpenActivityLogs={() => setIsActivityLogsOpen(true)}
         onOpenItinerary={() => setIsItineraryModalOpen(true)}
@@ -1369,32 +1402,48 @@ export default function App() {
         onExportExcel={handleExportExcel}
         onPrint={() => setIsPrintModalOpen(true)}
         onLogoUpload={async newLogo => {
+          if (currentUser && currentUser.role !== 'ADMIN') {
+            showToast('Permission denied: Only administrators can update the company logo.');
+            return;
+          }
+          if (isSupabaseConfigured()) {
+            const res = await updateCompanySettings(company, newLogo, terms);
+            if (!res.success) {
+              showToast(`Failed to save logo to cloud: ${res.message}`);
+              return;
+            }
+          }
           setLogo(newLogo);
           saveLogo(newLogo);
-          if (isSupabaseConfigured()) {
-            await updateCompanySettings(company, newLogo, terms);
-          }
           logActivity({
             action: 'UPDATE_LOGO',
             entity_type: 'company',
             summary: 'Updated official company logo header asset',
             user: currentUser
           });
-          showToast('Company logo updated and saved!');
+          showToast('Company logo updated and synced for all users & PDFs!');
         }}
         onLogoRemove={async () => {
+          if (currentUser && currentUser.role !== 'ADMIN') {
+            showToast('Permission denied: Only administrators can remove the company logo.');
+            return;
+          }
+          if (isSupabaseConfigured()) {
+            const res = await updateCompanySettings(company, null, terms);
+            if (!res.success) {
+              showToast(`Failed to remove logo from cloud: ${res.message}`);
+              return;
+            }
+          }
           setLogo(null);
           saveLogo(null);
-          if (isSupabaseConfigured()) {
-            await updateCompanySettings(company, null, terms);
-          }
           logActivity({
             action: 'REMOVE_LOGO',
             entity_type: 'company',
             summary: 'Removed company logo header asset',
             user: currentUser
           });
-          showToast('Logo removed.');
+          showToast('Company logo removed for all users.');
         }}
       />
 
@@ -1582,6 +1631,13 @@ export default function App() {
         showToast={showToast}
       />
 
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        currentUser={currentUser}
+        onClose={() => setIsChangePasswordOpen(false)}
+        showToast={showToast}
+      />
+
       <PasswordRecoveryModal
         isOpen={isPasswordRecoveryOpen}
         onClose={() => setIsPasswordRecoveryOpen(false)}
@@ -1595,27 +1651,75 @@ export default function App() {
         onRateCardsChange={(cards) => {
           setHotelRateCards(cards);
           saveHotelRatesToLocal(cards);
+          // Automatically sync hotel categories and rates for any already-selected hotels
+          if (nights.length > 0 && cards.length > 0) {
+            let synced = false;
+            const updatedNights = nights.map((night, nIdx) => {
+              let nightDate: Date;
+              if (customer.travelDate) {
+                nightDate = new Date(customer.travelDate + 'T00:00:00');
+                if (isNaN(nightDate.getTime())) nightDate = new Date();
+              } else {
+                nightDate = new Date();
+              }
+              nightDate.setDate(nightDate.getDate() + ((night.nightNumber || nIdx + 1) - 1));
+
+              return {
+                ...night,
+                rooms: night.rooms.map(room => {
+                  if (!room.hotel) return room;
+                  const calc = calculateRoomRate(room, cards, pricing.usdRate || 305, nightDate);
+                  if (calc.hotelMatched) {
+                    const nextCat = calc.rateCard?.hotelCategory || room.category;
+                    if (nextCat !== room.category || (calc.totalUsd > 0 && calc.totalUsd !== room.costUsd)) {
+                      synced = true;
+                      return {
+                        ...room,
+                        category: nextCat,
+                        ...(calc.totalUsd > 0 ? { costUsd: calc.totalUsd, cost: calc.totalLkr } : {})
+                      };
+                    }
+                  }
+                  return room;
+                })
+              };
+            });
+            if (synced) {
+              handleNightsChange(updatedNights);
+            }
+          }
         }}
         onApplyToNights={() => {
           let updatedCount = 0;
-          const updated = nights.map(night => ({
-            ...night,
-            rooms: night.rooms.map(room => {
-              if (!room.hotel) return room;
-              const calc = calculateRoomRate(room, hotelRateCards, pricing.usdRate || 305);
-              if (calc.hotelMatched && calc.totalUsd > 0) {
-                updatedCount++;
-                return {
-                  ...room,
-                  costUsd: calc.totalUsd,
-                  cost: calc.totalLkr
-                };
-              }
-              return room;
-            })
-          }));
+          const updated = nights.map((night, nIdx) => {
+            let nightDate: Date;
+            if (customer.travelDate) {
+              nightDate = new Date(customer.travelDate + 'T00:00:00');
+              if (isNaN(nightDate.getTime())) nightDate = new Date();
+            } else {
+              nightDate = new Date();
+            }
+            nightDate.setDate(nightDate.getDate() + ((night.nightNumber || nIdx + 1) - 1));
+
+            return {
+              ...night,
+              rooms: night.rooms.map(room => {
+                if (!room.hotel) return room;
+                const calc = calculateRoomRate(room, hotelRateCards, pricing.usdRate || 305, nightDate);
+                if (calc.hotelMatched) {
+                  updatedCount++;
+                  return {
+                    ...room,
+                    category: calc.rateCard?.hotelCategory || room.category,
+                    ...(calc.totalUsd > 0 ? { costUsd: calc.totalUsd, cost: calc.totalLkr } : {})
+                  };
+                }
+                return room;
+              })
+            };
+          });
           handleNightsChange(updated);
-          showToast(`Applied hotel rates to ${updatedCount} room(s)!`);
+          showToast(`Applied hotel rates & categories to ${updatedCount} room(s)!`);
         }}
         showToast={showToast}
       />
@@ -1663,6 +1767,7 @@ export default function App() {
         breakdown={breakdown}
         company={company}
         logo={logo}
+        generatedBy={formatGeneratedByLabel(currentUser)}
         onClose={() => setIsPrintModalOpen(false)}
         onTriggerPrint={() => {
           window.print();

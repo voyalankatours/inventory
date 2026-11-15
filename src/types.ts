@@ -244,7 +244,6 @@ export const BED_TYPES = [
 
 export const ROOM_CATEGORIES = [
   "Standard Room",
-  "Delux Room",
   "Deluxe Room",
   "Superior Room",
   "Executive room",
@@ -387,7 +386,9 @@ export interface ShareableQuotationData {
   breakdown: PricingBreakdown;
   company: CompanyDetails;
   logoUrl?: string;
+  logoMeta?: { w: number; h: number };
   shareTitle?: string;
+  generatedBy?: string;
 }
 
 export interface DatabaseBackup {

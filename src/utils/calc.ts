@@ -252,10 +252,16 @@ export function getTemplateVariables(
     : 'car (sedan)';
 
   const catMap: Record<string, string> = {
-    '5-Star Luxury': '5-star hotels',
-    '4-Star Premium': '4-star hotels',
-    '3-Star Comfort': '3-star hotels',
-    'Boutique Villa': 'boutique villas'
+    '5-star luxury': '5-star hotels',
+    '4-star premium': '4-star hotels',
+    '3-star comfort': '3-star hotels',
+    'boutique villa': 'boutique villas',
+    '5-star': '5-star hotels',
+    '4-star': '4-star hotels',
+    '3-star': '3-star hotels',
+    '5 star': '5-star hotels',
+    '4 star': '4-star hotels',
+    '3 star': '3-star hotels'
   };
 
   const allCats = new Set<string>();
@@ -263,7 +269,10 @@ export function getTemplateVariables(
 
   nights.slice(0, nightCount).forEach(n => {
     n.rooms.forEach(r => {
-      if (r.category) allCats.add(catMap[r.category] || r.category);
+      if (r.category) {
+        const mapped = catMap[r.category.toLowerCase().trim()];
+        allCats.add(mapped || r.category);
+      }
       if (r.meal) allMeals.add(r.meal);
     });
   });

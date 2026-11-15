@@ -9,6 +9,7 @@ import {
   FolderOpen,
   Globe,
   Image as ImageIcon,
+  KeyRound,
   MessageCircle,
   Plane,
   Printer,
@@ -36,6 +37,7 @@ interface HeaderProps {
   onOpenHotelRates?: () => void;
   onOpenAuth: () => void;
   onSignOut: () => void;
+  onOpenChangePassword: () => void;
   onOpenUserManagement: () => void;
   onOpenActivityLogs: () => void;
   onOpenItinerary: () => void;
@@ -64,6 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenHotelRates,
   onOpenAuth,
   onSignOut,
+  onOpenChangePassword,
   onOpenUserManagement,
   onOpenActivityLogs,
   onOpenItinerary,
@@ -90,9 +93,9 @@ export const Header: React.FC<HeaderProps> = ({
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const iw = img.naturalWidth || 400;
-        const ih = img.naturalHeight || 200;
-        const scale = Math.min(1, 400 / iw, 200 / ih);
+        const iw = img.naturalWidth || 320;
+        const ih = img.naturalHeight || 160;
+        const scale = Math.min(1, 320 / iw, 160 / ih);
         const w = Math.max(1, Math.round(iw * scale));
         const h = Math.max(1, Math.round(ih * scale));
 
@@ -103,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
           let dataUrl = canvas.toDataURL('image/png');
-          if (dataUrl.length > 180000) {
+          if (dataUrl.length > 60000) {
             ctx.globalCompositeOperation = 'destination-over';
             ctx.fillStyle = '#fff';
             ctx.fillRect(0, 0, w, h);
@@ -185,6 +188,15 @@ export const Header: React.FC<HeaderProps> = ({
                     <Users className="w-3.5 h-3.5" />
                   </button>
                 )}
+
+                <button
+                  onClick={onOpenChangePassword}
+                  className="flex items-center gap-1 px-1.5 py-1 hover:bg-slate-800 rounded-lg text-sky-400 hover:text-sky-300 transition-colors cursor-pointer text-[11px] font-medium"
+                  title="Change Account Password"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span className="hidden lg:inline">Password</span>
+                </button>
 
                 <button
                   onClick={onSignOut}
@@ -304,31 +316,35 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Reset</span>
             </button>
 
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
+            {(!currentUser || currentUser.role === 'ADMIN') && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
 
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-400 transition-colors cursor-pointer"
-              title="Upload custom company logo"
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span>Logo</span>
-            </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-400 transition-colors cursor-pointer"
+                  title="Upload official company logo (synced for all users & PDFs)"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Logo</span>
+                </button>
 
-            {logo && (
-              <button
-                onClick={onLogoRemove}
-                className="p-1.5 text-xs font-semibold rounded-lg border border-rose-900/60 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 transition-colors cursor-pointer"
-                title="Remove logo"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                {logo && (
+                  <button
+                    onClick={onLogoRemove}
+                    className="p-1.5 text-xs font-semibold rounded-lg border border-rose-900/60 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 transition-colors cursor-pointer"
+                    title="Remove company logo for all users"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
             )}
           </div>
 

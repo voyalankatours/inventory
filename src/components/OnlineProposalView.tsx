@@ -21,19 +21,21 @@ import {
   Utensils,
   XCircle
 } from 'lucide-react';
-import { LEGAL_NAME, ShareableQuotationData } from '../types';
+import { LEGAL_NAME, LogoData, ShareableQuotationData } from '../types';
 import { formatLKR, formatUSD, numberToWords } from '../utils/calc';
 import { downloadBlob, generateQuotationPDF, QuoteExportData } from '../utils/pdfExport';
 import { cleanWhatsAppPhone } from '../utils/shareLink';
 
 interface OnlineProposalViewProps {
   data: ShareableQuotationData;
+  fallbackLogo?: LogoData | null;
   onBackToEditor?: () => void;
   showToast?: (msg: string) => void;
 }
 
 export const OnlineProposalView: React.FC<OnlineProposalViewProps> = ({
   data,
+  fallbackLogo,
   onBackToEditor,
   showToast
 }) => {
@@ -41,6 +43,7 @@ export const OnlineProposalView: React.FC<OnlineProposalViewProps> = ({
   const p = data.pax;
   const b = data.breakdown;
   const comp = data.company;
+  const resolvedLogoUrl = data.logoUrl || fallbackLogo?.data;
   const totalNights = Math.max(0, p.days - 1);
   const totalPax = p.adults + p.child12 + p.child5;
 
@@ -75,8 +78,12 @@ export const OnlineProposalView: React.FC<OnlineProposalViewProps> = ({
   const handleDownloadPDF = () => {
     try {
       if (showToast) showToast('Preparing your quotation PDF...');
-      const logoObj = data.logoUrl
-        ? { data: data.logoUrl, w: 200, h: 80 }
+      const logoObj: LogoData | null = resolvedLogoUrl
+        ? {
+            data: resolvedLogoUrl,
+            w: data.logoMeta?.w || fallbackLogo?.w || 200,
+            h: data.logoMeta?.h || fallbackLogo?.h || 80
+          }
         : null;
 
       const exportData: QuoteExportData = {
@@ -90,7 +97,8 @@ export const OnlineProposalView: React.FC<OnlineProposalViewProps> = ({
         terms: data.terms,
         pricingBreakdown: data.breakdown,
         company: data.company,
-        logo: logoObj
+        logo: logoObj,
+        generatedBy: data.generatedBy
       };
 
       const blob = generateQuotationPDF(exportData);
@@ -161,9 +169,9 @@ export const OnlineProposalView: React.FC<OnlineProposalViewProps> = ({
               </button>
             )}
             <div className="flex items-center gap-2.5">
-              {data.logoUrl ? (
+              {resolvedLogoUrl ? (
                 <img
-                  src={data.logoUrl}
+                  src={resolvedLogoUrl}
                   alt="Voya Lanka Tours (Pvt) Ltd."
                   className="h-11 w-auto max-w-[140px] object-contain rounded bg-white p-1 -mt-0.5 shadow-sm"
                 />

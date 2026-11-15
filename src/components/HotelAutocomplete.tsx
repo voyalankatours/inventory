@@ -1,18 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Building2, Check, ChevronDown, MapPin, Plus, Search, Star, X } from 'lucide-react';
-import { PartnerHotel } from '../types';
+import { HotelRateCard, PartnerHotel } from '../types';
+import { findMatchingHotelRateCard } from '../utils/hotelRates';
 import { getAllPartnerHotels } from '../utils/storage';
 import { PartnerHotelsModal } from './PartnerHotelsModal';
 
 interface HotelAutocompleteProps {
   value: string;
   onChange: (hotelName: string, category?: string) => void;
+  rateCards?: HotelRateCard[];
   placeholder?: string;
 }
 
 export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   value,
   onChange,
+  rateCards = [],
   placeholder = 'Select or search trusted partner hotel...'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -54,19 +57,56 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  const combinedHotels = useMemo(() => {
+    const list: PartnerHotel[] = allHotels.map(h => {
+      if (rateCards && rateCards.length > 0) {
+        const matchedCard = findMatchingHotelRateCard(h.name, rateCards);
+        if (matchedCard?.hotelCategory) {
+          return { ...h, category: matchedCard.hotelCategory };
+        }
+      }
+      return h;
+    });
+
+    if (rateCards && rateCards.length > 0) {
+      const seenNames = new Set(list.map(h => h.name.toLowerCase().trim()));
+      rateCards.forEach(card => {
+        const cardName = (card.hotelName || '').trim();
+        const lowerCard = cardName.toLowerCase();
+        if (
+          cardName &&
+          !seenNames.has(lowerCard) &&
+          !list.some(h => lowerCard.includes(h.name.toLowerCase()) || h.name.toLowerCase().includes(lowerCard))
+        ) {
+          seenNames.add(lowerCard);
+          list.unshift({
+            name: cardName,
+            destination: 'Excel Rate Card',
+            category: card.hotelCategory || ''
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [allHotels, rateCards]);
+
   const filteredHotels = useMemo(() => {
     const q = (query || '').toLowerCase().trim();
-    if (!q) return allHotels;
-    return allHotels.filter(
+    if (!q) return combinedHotels;
+    return combinedHotels.filter(
       h =>
         h.name.toLowerCase().includes(q) ||
         h.destination.toLowerCase().includes(q) ||
         h.category.toLowerCase().includes(q)
     );
-  }, [query, allHotels]);
+  }, [query, combinedHotels]);
 
   const handleSelect = (hotel: PartnerHotel) => {
-    const formatted = `${hotel.name} - ${hotel.destination}`;
+    const formatted =
+      hotel.destination && hotel.destination !== 'Excel Rate Card'
+        ? `${hotel.name} - ${hotel.destination}`
+        : hotel.name;
     setQuery(formatted);
     onChange(formatted, hotel.category);
     setIsOpen(false);
