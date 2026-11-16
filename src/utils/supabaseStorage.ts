@@ -10,6 +10,7 @@ import {
   DEFAULT_ENTRANCE_TICKETS,
   DEFAULT_TERMS,
   EntranceTicketCatalogItem,
+  HotelRateCard,
   LogoData,
   PartnerHotel,
   SavedQuotation,
@@ -18,6 +19,7 @@ import {
   UserRole,
   VOYA_LANKA_PARTNER_HOTELS
 } from '../types';
+import { sanitizeHotelRateCards } from './hotelRates';
 
 // ==========================================
 // 1. User Profiles & Role-Based Access
@@ -233,11 +235,47 @@ export async function adminDeleteStaffAccount(
 // 2. Company Settings & Legal Terms
 // ==========================================
 
+export const HOTEL_RATES_SYNC_MARKER = '__VOYA_HOTEL_RATE_CARDS__';
+const HOTEL_RATES_SYNC_DEST = '__SYSTEM_SYNC__';
+
+let cachedCloudHotelRates: HotelRateCard[] | null = null;
+let cachedCloudHotelRatesUpdatedAt = '';
+
 export interface SharedCompanySettings {
   company: CompanyDetails;
   terms: TermsConfig;
   logo: LogoData | null;
+  hotelRateCards?: HotelRateCard[] | null;
+  hotelRateCardsUpdatedAt?: string;
   fromCloud?: boolean;
+}
+
+function extractTermsAndRates(rawTermsConfig: any): {
+  terms: TermsConfig;
+  hotelRateCards: HotelRateCard[] | null;
+  hotelRateCardsUpdatedAt: string;
+} {
+  const rawObj =
+    rawTermsConfig && typeof rawTermsConfig === 'object' ? { ...rawTermsConfig } : {};
+  const rawCards = Array.isArray(rawObj.__hotelRateCards)
+    ? sanitizeHotelRateCards(rawObj.__hotelRateCards as HotelRateCard[])
+    : null;
+  const updatedAt =
+    typeof rawObj.__hotelRateCardsUpdatedAt === 'string'
+      ? rawObj.__hotelRateCardsUpdatedAt
+      : '';
+
+  delete rawObj.__hotelRateCards;
+  delete rawObj.__hotelRateCardsUpdatedAt;
+
+  const terms: TermsConfig =
+    Object.keys(rawObj).length > 0 ? { ...DEFAULT_TERMS, ...rawObj } : DEFAULT_TERMS;
+
+  return {
+    terms,
+    hotelRateCards: rawCards,
+    hotelRateCardsUpdatedAt: updatedAt
+  };
 }
 
 export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
@@ -246,6 +284,7 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
       company: DEFAULT_COMPANY,
       terms: DEFAULT_TERMS,
       logo: null,
+      hotelRateCards: null,
       fromCloud: false
     };
   }
@@ -259,12 +298,23 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
 
     if (error) {
       console.warn('Error fetching company settings:', error.message);
-      return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null, fromCloud: false };
+      return {
+        company: DEFAULT_COMPANY,
+        terms: DEFAULT_TERMS,
+        logo: null,
+        hotelRateCards: null,
+        fromCloud: false
+      };
     }
 
     if (!data) {
-      // First-time initialization of singleton row
-      return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null, fromCloud: false };
+      return {
+        company: DEFAULT_COMPANY,
+        terms: DEFAULT_TERMS,
+        logo: null,
+        hotelRateCards: null,
+        fromCloud: false
+      };
     }
 
     const company: CompanyDetails = {
@@ -294,27 +344,70 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
       }
     }
 
-    const terms: TermsConfig = data.terms_config && Object.keys(data.terms_config).length > 0
-      ? { ...DEFAULT_TERMS, ...data.terms_config }
-      : DEFAULT_TERMS;
+    const { terms, hotelRateCards, hotelRateCardsUpdatedAt } = extractTermsAndRates(
+      data.terms_config
+    );
 
-    return { company, terms, logo, fromCloud: true };
+    if (hotelRateCards !== null) {
+      cachedCloudHotelRates = hotelRateCards;
+      cachedCloudHotelRatesUpdatedAt = hotelRateCardsUpdatedAt;
+    }
+
+    return {
+      company,
+      terms,
+      logo,
+      hotelRateCards,
+      hotelRateCardsUpdatedAt,
+      fromCloud: true
+    };
   } catch (err) {
     console.error('Failed to load company settings from Supabase:', err);
-    return { company: DEFAULT_COMPANY, terms: DEFAULT_TERMS, logo: null, fromCloud: false };
+    return {
+      company: DEFAULT_COMPANY,
+      terms: DEFAULT_TERMS,
+      logo: null,
+      hotelRateCards: null,
+      fromCloud: false
+    };
   }
 }
 
 export async function updateCompanySettings(
   company: CompanyDetails,
   logo: LogoData | null,
-  terms?: TermsConfig
+  terms?: TermsConfig,
+  hotelRateCards?: HotelRateCard[]
 ): Promise<{ success: boolean; message: string }> {
   if (!isSupabaseConfigured()) {
     return { success: true, message: 'Settings saved locally.' };
   }
 
   try {
+    let cardsToPersist = hotelRateCards;
+    let updatedAtToPersist =
+      hotelRateCards !== undefined ? new Date().toISOString() : cachedCloudHotelRatesUpdatedAt;
+
+    if (cardsToPersist === undefined) {
+      if (cachedCloudHotelRates !== null) {
+        cardsToPersist = cachedCloudHotelRates;
+      } else {
+        const { data: existingRow } = await supabase
+          .from('company_settings')
+          .select('terms_config')
+          .eq('id', 1)
+          .maybeSingle();
+        if (existingRow?.terms_config) {
+          const extracted = extractTermsAndRates(existingRow.terms_config);
+          cardsToPersist = extracted.hotelRateCards ?? undefined;
+          updatedAtToPersist = extracted.hotelRateCardsUpdatedAt;
+        }
+      }
+    } else {
+      cachedCloudHotelRates = cardsToPersist;
+      cachedCloudHotelRatesUpdatedAt = updatedAtToPersist;
+    }
+
     const payload: any = {
       id: 1,
       name: company.name || DEFAULT_COMPANY.name,
@@ -327,8 +420,19 @@ export async function updateCompanySettings(
       updated_at: new Date().toISOString()
     };
 
-    if (terms) {
-      payload.terms_config = terms;
+    const termsObj: Record<string, any> = {
+      ...(terms || DEFAULT_TERMS)
+    };
+    delete termsObj.__hotelRateCards;
+    delete termsObj.__hotelRateCardsUpdatedAt;
+
+    if (cardsToPersist !== undefined && cardsToPersist !== null) {
+      termsObj.__hotelRateCards = cardsToPersist;
+      termsObj.__hotelRateCardsUpdatedAt = updatedAtToPersist || new Date().toISOString();
+    }
+
+    if (terms || (cardsToPersist !== undefined && cardsToPersist !== null)) {
+      payload.terms_config = termsObj;
     }
 
     const { error } = await supabase
@@ -347,6 +451,181 @@ export async function updateCompanySettings(
   } catch (err: any) {
     console.error('Failed to update company settings:', err);
     return { success: false, message: err.message || 'Could not update company settings.' };
+  }
+}
+
+export async function fetchHotelRatesFromCloud(): Promise<{
+  rateCards: HotelRateCard[] | null;
+  updatedAt: string;
+}> {
+  if (!isSupabaseConfigured()) {
+    return { rateCards: null, updatedAt: '' };
+  }
+
+  let companyCards: HotelRateCard[] | null = null;
+  let companyUpdatedAt = '';
+  let partnerCards: HotelRateCard[] | null = null;
+  let partnerUpdatedAt = '';
+
+  try {
+    const { data: csRow } = await supabase
+      .from('company_settings')
+      .select('terms_config')
+      .eq('id', 1)
+      .maybeSingle();
+
+    if (csRow?.terms_config) {
+      const extracted = extractTermsAndRates(csRow.terms_config);
+      companyCards = extracted.hotelRateCards;
+      companyUpdatedAt = extracted.hotelRateCardsUpdatedAt;
+    }
+  } catch (err) {
+    console.warn('Could not read hotel rates from company_settings:', err);
+  }
+
+  try {
+    const { data: phRow } = await supabase
+      .from('partner_hotels')
+      .select('category')
+      .eq('name', HOTEL_RATES_SYNC_MARKER)
+      .eq('destination', HOTEL_RATES_SYNC_DEST)
+      .maybeSingle();
+
+    if (phRow?.category) {
+      const parsed = JSON.parse(phRow.category);
+      if (parsed && Array.isArray(parsed.cards)) {
+        partnerCards = sanitizeHotelRateCards(parsed.cards);
+        partnerUpdatedAt = typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '';
+      }
+    }
+  } catch (_) {
+    // Ignore if unauthenticated or marker row doesn't exist
+  }
+
+  if (partnerCards && companyCards) {
+    const chosen = partnerUpdatedAt > companyUpdatedAt ? partnerCards : companyCards;
+    const chosenAt = partnerUpdatedAt > companyUpdatedAt ? partnerUpdatedAt : companyUpdatedAt;
+    cachedCloudHotelRates = chosen;
+    cachedCloudHotelRatesUpdatedAt = chosenAt;
+    return { rateCards: chosen, updatedAt: chosenAt };
+  }
+
+  if (partnerCards) {
+    cachedCloudHotelRates = partnerCards;
+    cachedCloudHotelRatesUpdatedAt = partnerUpdatedAt;
+    return { rateCards: partnerCards, updatedAt: partnerUpdatedAt };
+  }
+
+  if (companyCards) {
+    cachedCloudHotelRates = companyCards;
+    cachedCloudHotelRatesUpdatedAt = companyUpdatedAt;
+    return { rateCards: companyCards, updatedAt: companyUpdatedAt };
+  }
+
+  return { rateCards: null, updatedAt: '' };
+}
+
+export async function saveHotelRatesToCloud(
+  rateCards: HotelRateCard[],
+  company?: CompanyDetails,
+  terms?: TermsConfig,
+  logo?: LogoData | null
+): Promise<{ success: boolean; message: string }> {
+  const sanitized = sanitizeHotelRateCards(rateCards);
+  const nowIso = new Date().toISOString();
+  cachedCloudHotelRates = sanitized;
+  cachedCloudHotelRatesUpdatedAt = nowIso;
+
+  if (!isSupabaseConfigured()) {
+    return { success: true, message: 'Hotel rates saved locally.' };
+  }
+
+  try {
+    const { data: existingRow } = await supabase
+      .from('company_settings')
+      .select('id, terms_config')
+      .eq('id', 1)
+      .maybeSingle();
+
+    const baseTerms: Record<string, any> =
+      existingRow?.terms_config && typeof existingRow.terms_config === 'object'
+        ? { ...existingRow.terms_config }
+        : { ...(terms || DEFAULT_TERMS) };
+
+    baseTerms.__hotelRateCards = sanitized;
+    baseTerms.__hotelRateCardsUpdatedAt = nowIso;
+
+    if (existingRow) {
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          terms_config: baseTerms,
+          updated_at: nowIso
+        })
+        .eq('id', 1);
+
+      if (!error) {
+        return { success: true, message: 'Hotel rates synced to cloud for all users!' };
+      }
+
+      if (error.code !== '42501' && !error.message.includes('row-level security')) {
+        console.warn('Error updating company_settings hotel rates:', error.message);
+      }
+    } else if (company) {
+      const res = await updateCompanySettings(company, logo ?? null, terms, sanitized);
+      if (res.success) {
+        return { success: true, message: 'Hotel rates synced to cloud for all users!' };
+      }
+    }
+  } catch (err) {
+    console.warn('Primary cloud hotel rate save skipped, trying team sync fallback:', err);
+  }
+
+  // Fallback for STAFF users (who do not have admin RLS on company_settings):
+  // Persist via authenticated partner_hotels system sync row
+  try {
+    const syncPayload = JSON.stringify({
+      updatedAt: nowIso,
+      cards: sanitized
+    });
+
+    const { data: existingMarker } = await supabase
+      .from('partner_hotels')
+      .select('id')
+      .eq('name', HOTEL_RATES_SYNC_MARKER)
+      .eq('destination', HOTEL_RATES_SYNC_DEST)
+      .maybeSingle();
+
+    if (existingMarker?.id) {
+      const { error } = await supabase
+        .from('partner_hotels')
+        .update({ category: syncPayload })
+        .eq('id', existingMarker.id);
+
+      if (error) {
+        return { success: false, message: error.message };
+      }
+    } else {
+      const { error } = await supabase
+        .from('partner_hotels')
+        .insert({
+          name: HOTEL_RATES_SYNC_MARKER,
+          destination: HOTEL_RATES_SYNC_DEST,
+          category: syncPayload
+        });
+
+      if (error) {
+        return { success: false, message: error.message };
+      }
+    }
+
+    return { success: true, message: 'Hotel rates synced to cloud for all team members!' };
+  } catch (err: any) {
+    console.error('Failed to sync hotel rates to cloud:', err);
+    return {
+      success: false,
+      message: err?.message || 'Could not sync hotel rates to cloud.'
+    };
   }
 }
 
@@ -686,13 +965,15 @@ export async function fetchPartnerHotels(): Promise<PartnerHotel[]> {
       return VOYA_LANKA_PARTNER_HOTELS;
     }
 
-    if (!data || data.length === 0) {
+    const filtered = (data || []).filter(h => h.name !== HOTEL_RATES_SYNC_MARKER);
+
+    if (filtered.length === 0) {
       // Auto-seed default partner hotels if table is fresh
       await seedDefaultPartnerHotels();
       return VOYA_LANKA_PARTNER_HOTELS;
     }
 
-    return data;
+    return filtered;
   } catch (err) {
     console.error('Failed to load partner hotels from Supabase:', err);
     return VOYA_LANKA_PARTNER_HOTELS;

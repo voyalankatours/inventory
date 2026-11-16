@@ -26,7 +26,7 @@ import { HotelRatesModal } from './components/HotelRatesModal';
 import { VoucherModal } from './components/VoucherModal';
 import { WhatsAppShareModal } from './components/WhatsAppShareModal';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
-import { calculateRoomRate, loadSavedHotelRates, saveHotelRatesToLocal } from './utils/hotelRates';
+import { calculateRoomRate, HOTEL_RATES_STORAGE_KEY, loadSavedHotelRates, saveHotelRatesToLocal } from './utils/hotelRates';
 import {
   CloudSyncStatus,
   CompanyDetails,
@@ -55,9 +55,11 @@ import {
   deleteQuotationFromCloud,
   fetchCompanySettings,
   fetchCustomers,
+  fetchHotelRatesFromCloud,
   fetchQuotations,
   fetchUserProfile,
   logActivity,
+  saveHotelRatesToCloud,
   saveQuotationToCloud,
   saveUserDraftToCloud,
   subscribeToCloudChanges,
@@ -304,10 +306,11 @@ export default function App() {
     if (!isSupabaseConfigured()) return;
     try {
       setSyncStatus('syncing');
-      const [cloudQuotes, cloudCusts, cloudSettings] = await Promise.all([
+      const [cloudQuotes, cloudCusts, cloudSettings, cloudHotelRates] = await Promise.all([
         fetchQuotations(),
         fetchCustomers(),
-        fetchCompanySettings()
+        fetchCompanySettings(),
+        fetchHotelRatesFromCloud()
       ]);
       setSavedQuotes(cloudQuotes);
       setCustomers(cloudCusts);
@@ -318,6 +321,25 @@ export default function App() {
         saveTermsConfig(cloudSettings.terms);
         setLogo(cloudSettings.logo);
         saveLogo(cloudSettings.logo);
+      }
+      if (cloudHotelRates.rateCards !== null) {
+        setHotelRateCards(cloudHotelRates.rateCards);
+        saveHotelRatesToLocal(cloudHotelRates.rateCards);
+      } else {
+        // Backfill locally uploaded hotel rates to cloud if none have been synced yet
+        try {
+          if (localStorage.getItem(HOTEL_RATES_STORAGE_KEY)) {
+            const localCards = loadSavedHotelRates();
+            if (localCards.length > 0) {
+              await saveHotelRatesToCloud(
+                localCards,
+                cloudSettings?.company,
+                cloudSettings?.terms,
+                cloudSettings?.logo
+              );
+            }
+          }
+        } catch (_) {}
       }
       setSyncStatus('connected');
     } catch (err) {
@@ -438,11 +460,19 @@ export default function App() {
         setCustomers(cList);
         setSyncStatus('connected');
       },
-      onHotelsChange: () => {
+      onHotelsChange: async () => {
         window.dispatchEvent(new CustomEvent('voya_partner_hotels_updated'));
+        const cloudRates = await fetchHotelRatesFromCloud();
+        if (cloudRates.rateCards !== null) {
+          setHotelRateCards(cloudRates.rateCards);
+          saveHotelRatesToLocal(cloudRates.rateCards);
+        }
       },
       onCompanySettingsChange: async () => {
-        const cs = await fetchCompanySettings();
+        const [cs, cloudRates] = await Promise.all([
+          fetchCompanySettings(),
+          fetchHotelRatesFromCloud()
+        ]);
         if (cs.fromCloud) {
           setCompany(cs.company);
           saveCompanyDetails(cs.company);
@@ -450,6 +480,11 @@ export default function App() {
           saveTermsConfig(cs.terms);
           setLogo(cs.logo);
           saveLogo(cs.logo);
+        }
+        const resolvedCards = cloudRates.rateCards ?? cs.hotelRateCards ?? null;
+        if (resolvedCards !== null) {
+          setHotelRateCards(resolvedCards);
+          saveHotelRatesToLocal(resolvedCards);
         }
       }
     });
@@ -505,7 +540,7 @@ export default function App() {
       const storedTerms = loadTermsConfig();
       setTerms(storedTerms);
 
-      // Also attempt to fetch shared company settings (including logo) on startup so Login & Shared links stay in sync
+      // Also attempt to fetch shared company settings (including logo & hotel rate cards) on startup so Login & Shared links stay in sync
       if (isSupabaseConfigured()) {
         fetchCompanySettings().then(cs => {
           if (cs.fromCloud) {
@@ -515,6 +550,10 @@ export default function App() {
             saveTermsConfig(cs.terms);
             setLogo(cs.logo);
             saveLogo(cs.logo);
+            if (cs.hotelRateCards) {
+              setHotelRateCards(cs.hotelRateCards);
+              saveHotelRatesToLocal(cs.hotelRateCards);
+            }
           }
         }).catch(() => {});
       }
@@ -1407,7 +1446,7 @@ export default function App() {
             return;
           }
           if (isSupabaseConfigured()) {
-            const res = await updateCompanySettings(company, newLogo, terms);
+            const res = await updateCompanySettings(company, newLogo, terms, hotelRateCards);
             if (!res.success) {
               showToast(`Failed to save logo to cloud: ${res.message}`);
               return;
@@ -1429,7 +1468,7 @@ export default function App() {
             return;
           }
           if (isSupabaseConfigured()) {
-            const res = await updateCompanySettings(company, null, terms);
+            const res = await updateCompanySettings(company, null, terms, hotelRateCards);
             if (!res.success) {
               showToast(`Failed to remove logo from cloud: ${res.message}`);
               return;
@@ -1597,7 +1636,7 @@ export default function App() {
           setCompany(updatedCo);
           saveCompanyDetails(updatedCo);
           if (isSupabaseConfigured()) {
-            await updateCompanySettings(updatedCo, logo, terms);
+            await updateCompanySettings(updatedCo, logo, terms, hotelRateCards);
           }
           logActivity({
             action: 'UPDATE_COMPANY',
@@ -1648,9 +1687,17 @@ export default function App() {
         isOpen={isHotelRatesModalOpen}
         onClose={() => setIsHotelRatesModalOpen(false)}
         rateCards={hotelRateCards}
-        onRateCardsChange={(cards) => {
+        onRateCardsChange={async (cards) => {
           setHotelRateCards(cards);
           saveHotelRatesToLocal(cards);
+          if (isSupabaseConfigured()) {
+            setSyncStatus('syncing');
+            const cloudRes = await saveHotelRatesToCloud(cards, company, terms, logo);
+            setSyncStatus(cloudRes.success ? 'connected' : 'error');
+            if (!cloudRes.success) {
+              showToast(`Saved locally, but cloud sync failed: ${cloudRes.message}`);
+            }
+          }
           // Automatically sync hotel categories and rates for any already-selected hotels
           if (nights.length > 0 && cards.length > 0) {
             let synced = false;

@@ -867,6 +867,26 @@ export function downloadSampleRatesTemplate() {
   URL.revokeObjectURL(url);
 }
 
+export function sanitizeHotelRateCards(cards: HotelRateCard[]): HotelRateCard[] {
+  return cards.map((card: HotelRateCard) => {
+    if (card.roomCategoryRates && 'Sea View Room' in card.roomCategoryRates) {
+      const seaRate = card.roomCategoryRates['Sea View Room'];
+      const newCatRates = { ...card.roomCategoryRates };
+      delete newCatRates['Sea View Room'];
+      const newViewRates = { ...card.roomViewRates };
+      if (seaRate > 0 && (!newViewRates['Sea View'] || newViewRates['Sea View'] === 0)) {
+        newViewRates['Sea View'] = seaRate;
+      }
+      return {
+        ...card,
+        roomCategoryRates: newCatRates,
+        roomViewRates: newViewRates
+      };
+    }
+    return card;
+  });
+}
+
 /**
  * Storage helpers
  */
@@ -876,24 +896,7 @@ export function loadSavedHotelRates(): HotelRateCard[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Sanitize: remove 'Sea View Room' from roomCategoryRates
-        return parsed.map((card: HotelRateCard) => {
-          if (card.roomCategoryRates && 'Sea View Room' in card.roomCategoryRates) {
-            const seaRate = card.roomCategoryRates['Sea View Room'];
-            const newCatRates = { ...card.roomCategoryRates };
-            delete newCatRates['Sea View Room'];
-            const newViewRates = { ...card.roomViewRates };
-            if (seaRate > 0 && (!newViewRates['Sea View'] || newViewRates['Sea View'] === 0)) {
-              newViewRates['Sea View'] = seaRate;
-            }
-            return {
-              ...card,
-              roomCategoryRates: newCatRates,
-              roomViewRates: newViewRates
-            };
-          }
-          return card;
-        });
+        return sanitizeHotelRateCards(parsed);
       }
     }
   } catch (err) {

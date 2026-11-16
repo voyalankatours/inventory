@@ -32,7 +32,7 @@ interface HotelRatesModalProps {
   isOpen: boolean;
   onClose: () => void;
   rateCards: HotelRateCard[];
-  onRateCardsChange: (cards: HotelRateCard[]) => void;
+  onRateCardsChange: (cards: HotelRateCard[]) => Promise<void> | void;
   onApplyToNights?: () => void;
   showToast: (msg: string) => void;
 }
@@ -65,7 +65,7 @@ export const HotelRatesModal: React.FC<HotelRatesModalProps> = ({
 
     try {
       const buffer = await file.arrayBuffer();
-      const { rateCards: parsedCards, warnings } = await parseHotelRatesExcel(buffer);
+      const { rateCards: parsedCards } = await parseHotelRatesExcel(buffer);
 
       if (!parsedCards.length) {
         throw new Error('No hotel rates could be parsed from the uploaded file.');
@@ -77,15 +77,15 @@ export const HotelRatesModal: React.FC<HotelRatesModalProps> = ({
       const preservedCards = rateCards.filter((c) => !newKeys.has(cardKey(c)));
       const combined = [...parsedCards, ...preservedCards];
 
-      onRateCardsChange(combined);
       saveHotelRatesToLocal(combined);
+      await onRateCardsChange(combined);
       setSelectedHotelIndex(0);
 
       const msg = `Successfully loaded ${parsedCards.length} hotel rate card(s): ${parsedCards
         .map((c) => c.hotelName)
         .join(', ')}`;
       setUploadSuccess(msg);
-      showToast(`Loaded ${parsedCards.length} hotel rate card(s) from Excel!`);
+      showToast(`Loaded ${parsedCards.length} hotel rate card(s) and synced!`);
     } catch (err: any) {
       console.error('Failed to parse Excel:', err);
       setUploadError(
@@ -106,19 +106,19 @@ export const HotelRatesModal: React.FC<HotelRatesModalProps> = ({
     }
   };
 
-  const handleRestoreSample = () => {
-    onRateCardsChange(DEFAULT_HOTEL_RATES);
+  const handleRestoreSample = async () => {
     saveHotelRatesToLocal(DEFAULT_HOTEL_RATES);
+    await onRateCardsChange(DEFAULT_HOTEL_RATES);
     setSelectedHotelIndex(0);
     setUploadSuccess('Restored sample hotel rates (Taj Samudra - 4 validity periods).');
-    showToast('Sample hotel rates restored!');
+    showToast('Sample hotel rates restored & synced!');
   };
 
-  const handleDeleteCard = (indexToDelete: number) => {
+  const handleDeleteCard = async (indexToDelete: number) => {
     const target = rateCards[indexToDelete];
     const updated = rateCards.filter((_, idx) => idx !== indexToDelete);
-    onRateCardsChange(updated);
     saveHotelRatesToLocal(updated);
+    await onRateCardsChange(updated);
     if (selectedHotelIndex >= updated.length) {
       setSelectedHotelIndex(Math.max(0, updated.length - 1));
     }
