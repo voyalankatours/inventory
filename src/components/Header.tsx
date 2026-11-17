@@ -20,6 +20,7 @@ import {
   Sparkles,
   History,
   Trash2,
+  TrendingUp,
   User,
   Users,
   LogIn,
@@ -30,11 +31,13 @@ import { CloudSyncStatus, LogoData, UserProfile } from '../types';
 interface HeaderProps {
   logo: LogoData | null;
   savedCount: number;
+  confirmedCount?: number;
   customerCount: number;
   currentUser: UserProfile | null;
   syncStatus: CloudSyncStatus;
   hotelRatesCount?: number;
   onOpenHotelRates?: () => void;
+  onOpenOverallProfit?: () => void;
   onOpenAuth: () => void;
   onSignOut: () => void;
   onOpenChangePassword: () => void;
@@ -59,11 +62,13 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   logo,
   savedCount,
+  confirmedCount = 0,
   customerCount,
   currentUser,
   syncStatus,
   hotelRatesCount = 0,
   onOpenHotelRates,
+  onOpenOverallProfit,
   onOpenAuth,
   onSignOut,
   onOpenChangePassword,
@@ -233,7 +238,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={onOpenSaved}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-amber-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-amber-300 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               title="Saved quotations"
             >
               <FolderOpen className="w-3.5 h-3.5" />
@@ -242,6 +247,20 @@ export const Header: React.FC<HeaderProps> = ({
                 {savedCount}
               </span>
             </button>
+
+            {onOpenOverallProfit && (
+              <button
+                onClick={onOpenOverallProfit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-700/80 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                title="Check overall quoted price and actual profit for confirmed tours"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Overall Profit</span>
+                <span className="text-[11px] font-mono tabular-nums text-emerald-200">
+                  · {confirmedCount}
+                </span>
+              </button>
+            )}
 
             <button
               onClick={onOpenCustomers}

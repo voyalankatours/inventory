@@ -13,10 +13,12 @@ import { Header } from './components/Header';
 import { ItineraryModal } from './components/ItineraryModal';
 import { LoginPage } from './components/LoginPage';
 import { OnlineProposalView } from './components/OnlineProposalView';
+import { OverallProfitModal } from './components/OverallProfitModal';
 import { Plane } from 'lucide-react';
 import { PaxSection } from './components/PaxSection';
 import { PricingSidebar } from './components/PricingSidebar';
 import { PrintModal } from './components/PrintModal';
+import { QuotationChecklistModal } from './components/QuotationChecklistModal';
 import { SavedModal } from './components/SavedModal';
 import { TermsSection } from './components/TermsSection';
 import { TransportationSection } from './components/TransportationSection';
@@ -96,6 +98,7 @@ import {
   saveCompanyDetails,
   saveDraftQuote,
   saveLogo,
+  saveQuotesList,
   saveSingleQuote,
   saveTermsConfig,
   upsertCustomerFromQuote
@@ -273,6 +276,8 @@ export default function App() {
   const [sharedProposalData, setSharedProposalData] = useState<ShareableQuotationData | null>(null);
 
   const [activeVoucherNight, setActiveVoucherNight] = useState<number | null>(null);
+  const [activeChecklistQuote, setActiveChecklistQuote] = useState<SavedQuotation | null>(null);
+  const [isOverallProfitOpen, setIsOverallProfitOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const isInitialized = useRef(false);
@@ -948,7 +953,8 @@ export default function App() {
 
   // Handler: Save Quotation Record
   const handleSaveQuote = async () => {
-    const isExisting = savedQuotes.some(q => q.id === customer.qno);
+    const existingQuote = savedQuotes.find(q => q.id === customer.qno);
+    const isExisting = !!existingQuote;
     const record: SavedQuotation = {
       id: customer.qno,
       savedAt: new Date().toISOString(),
@@ -962,6 +968,9 @@ export default function App() {
       terms: { ...terms },
       itinerary: JSON.parse(JSON.stringify(itinerary)),
       vconf: { ...vconf },
+      isConfirmed: existingQuote?.isConfirmed,
+      confirmedAt: existingQuote?.confirmedAt,
+      checklist: existingQuote?.checklist,
       finLKR: formatLKR(breakdown.fin),
       finUSD: formatUSD(breakdown.usd),
       finLKRn: Math.round(breakdown.fin),
@@ -1050,8 +1059,100 @@ export default function App() {
     if (saved.terms) setTerms(saved.terms);
     if (saved.itinerary) setItinerary(saved.itinerary);
     if (saved.vconf) setVconf(saved.vconf);
+    setActiveChecklistQuote(null);
     setIsSavedModalOpen(false);
     showToast(`Loaded quotation ${saved.id}`);
+  };
+
+  // Handler: Save Checklist & Profit Calculation for a Saved Quotation
+  const handleSaveChecklist = async (updatedQuote: SavedQuotation) => {
+    setSyncStatus('syncing');
+
+    if (isSupabaseConfigured()) {
+      const cloudRes = await saveQuotationToCloud(updatedQuote, currentUser);
+      if (!cloudRes.success) {
+        showToast(cloudRes.message);
+        setSyncStatus('error');
+        return;
+      }
+    }
+
+    const updatedList = savedQuotes.some(q => q.id === updatedQuote.id)
+      ? savedQuotes.map(q => (q.id === updatedQuote.id ? updatedQuote : q))
+      : [updatedQuote, ...savedQuotes];
+
+    setSavedQuotes(updatedList);
+    saveQuotesList(updatedList);
+    setActiveChecklistQuote(updatedQuote);
+    setSyncStatus('connected');
+
+    logActivity({
+      action: 'UPDATE_QUOTATION',
+      entity_type: 'quotation',
+      entity_id: updatedQuote.id,
+      summary: `Updated checklist & profit calculation for quotation ${updatedQuote.id} (${updatedQuote.customer?.custName || 'Valued Guest'})`,
+      details: {
+        quotation_id: updatedQuote.id,
+        itinerary_sent: updatedQuote.checklist?.itinerarySent,
+        quotation_sent: updatedQuote.checklist?.quotationSent,
+        advance_received: updatedQuote.checklist?.advanceReceived,
+        advance_currency: updatedQuote.checklist?.advanceCurrency,
+        actual_usd_rate: updatedQuote.checklist?.actualUsdRate
+      },
+      user: currentUser
+    });
+
+    showToast(`Checklist & profit calculation saved for ${updatedQuote.id}!`);
+  };
+
+  // Handler: Toggle Confirmed status for a Saved Quotation
+  const handleToggleConfirmedTour = async (quote: SavedQuotation) => {
+    const nextConfirmed = !quote.isConfirmed;
+    const updatedQuote: SavedQuotation = {
+      ...quote,
+      isConfirmed: nextConfirmed,
+      confirmedAt: nextConfirmed ? quote.confirmedAt || new Date().toISOString() : undefined
+    };
+
+    setSyncStatus('syncing');
+
+    if (isSupabaseConfigured()) {
+      const cloudRes = await saveQuotationToCloud(updatedQuote, currentUser);
+      if (!cloudRes.success) {
+        showToast(cloudRes.message);
+        setSyncStatus('error');
+        return;
+      }
+    }
+
+    const updatedList = savedQuotes.some(q => q.id === updatedQuote.id)
+      ? savedQuotes.map(q => (q.id === updatedQuote.id ? updatedQuote : q))
+      : [updatedQuote, ...savedQuotes];
+
+    setSavedQuotes(updatedList);
+    saveQuotesList(updatedList);
+    if (activeChecklistQuote?.id === updatedQuote.id) {
+      setActiveChecklistQuote(updatedQuote);
+    }
+    setSyncStatus('connected');
+
+    logActivity({
+      action: 'UPDATE_QUOTATION',
+      entity_type: 'quotation',
+      entity_id: updatedQuote.id,
+      summary: `${nextConfirmed ? 'Confirmed' : 'Unconfirmed'} tour ${updatedQuote.id} (${updatedQuote.customer?.custName || 'Valued Guest'})`,
+      details: {
+        quotation_id: updatedQuote.id,
+        is_confirmed: nextConfirmed
+      },
+      user: currentUser
+    });
+
+    showToast(
+      nextConfirmed
+        ? `Tour ${updatedQuote.id} marked as Confirmed and added to Overall Profit!`
+        : `Tour ${updatedQuote.id} unmarked as Confirmed.`
+    );
   };
 
   // Handler: Delete Saved Quote
@@ -1418,11 +1519,13 @@ export default function App() {
       <Header
         logo={logo}
         savedCount={savedQuotes.length}
+        confirmedCount={savedQuotes.filter(q => q.isConfirmed).length}
         customerCount={customers.length}
         currentUser={currentUser}
         syncStatus={syncStatus}
         hotelRatesCount={hotelRateCards.length}
         onOpenHotelRates={() => setIsHotelRatesModalOpen(true)}
+        onOpenOverallProfit={() => setIsOverallProfitOpen(true)}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onSignOut={handleSignOut}
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
@@ -1595,9 +1698,35 @@ export default function App() {
         savedQuotes={savedQuotes}
         currentUser={currentUser}
         onClose={() => setIsSavedModalOpen(false)}
+        onOpenChecklist={quote => setActiveChecklistQuote(quote)}
+        onToggleConfirmed={handleToggleConfirmedTour}
+        onOpenOverallProfit={() => {
+          setIsSavedModalOpen(false);
+          setIsOverallProfitOpen(true);
+        }}
         onLoadQuote={handleLoadSavedQuote}
         onDeleteQuote={handleDeleteSavedQuote}
         onClearAll={handleClearAllQuotes}
+      />
+
+      <OverallProfitModal
+        isOpen={isOverallProfitOpen}
+        savedQuotes={savedQuotes}
+        onClose={() => setIsOverallProfitOpen(false)}
+        onOpenChecklist={quote => setActiveChecklistQuote(quote)}
+        onToggleConfirmed={handleToggleConfirmedTour}
+        onOpenSavedModal={() => {
+          setIsOverallProfitOpen(false);
+          setIsSavedModalOpen(true);
+        }}
+      />
+
+      <QuotationChecklistModal
+        isOpen={!!activeChecklistQuote}
+        quote={activeChecklistQuote}
+        onClose={() => setActiveChecklistQuote(null)}
+        onSaveChecklist={handleSaveChecklist}
+        onLoadQuote={handleLoadSavedQuote}
       />
 
       <CustomerDatabaseModal
@@ -1823,7 +1952,7 @@ export default function App() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs font-bold animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="fixed bottom-5 right-5 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl z-[70] text-xs font-bold animate-in fade-in slide-in-from-bottom-2 duration-200">
           {toastMessage}
         </div>
       )}

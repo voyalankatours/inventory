@@ -152,6 +152,31 @@ export interface PricingBreakdown {
   ppUSD: number;
 }
 
+export interface ChecklistCostEntry {
+  amount: number;
+  currency: 'LKR' | 'USD';
+}
+
+export interface ActualExpenseItem {
+  id: string;
+  description: string;
+  amount: number;
+  currency: 'LKR' | 'USD';
+}
+
+export interface QuotationChecklistData {
+  itinerarySent: boolean;
+  quotationSent: boolean;
+  hotelVouchers: Record<string, boolean>;
+  advanceReceived: number;
+  advanceCurrency: 'LKR' | 'USD';
+  actualUsdRate: number;
+  actualCosts: Record<string, ChecklistCostEntry>;
+  otherExpenses: ActualExpenseItem[];
+  notes?: string;
+  updatedAt?: string;
+}
+
 export interface SavedQuotation {
   id: string;
   savedAt: string;
@@ -169,6 +194,9 @@ export interface SavedQuotation {
   finUSD: string;
   finLKRn: number;
   finUSDn: number;
+  isConfirmed?: boolean;
+  confirmedAt?: string;
+  checklist?: QuotationChecklistData;
 }
 
 export interface PartnerHotel {

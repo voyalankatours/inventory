@@ -673,7 +673,10 @@ export async function fetchQuotations(): Promise<SavedQuotation[]> {
         finLKR: qd.finLKR || String(row.fin_lkr || 0),
         finUSD: qd.finUSD || String(row.fin_usd || 0),
         finLKRn: Number(row.fin_lkr) || qd.finLKRn || 0,
-        finUSDn: Number(row.fin_usd) || qd.finUSDn || 0
+        finUSDn: Number(row.fin_usd) || qd.finUSDn || 0,
+        isConfirmed: Boolean(qd.isConfirmed),
+        confirmedAt: qd.confirmedAt || undefined,
+        checklist: qd.checklist || undefined
       };
     });
   } catch (err) {
