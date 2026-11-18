@@ -132,37 +132,37 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-slate-950 border-b border-slate-800 sticky top-0 z-40 py-2.5">
-      <div className="max-w-7xl mx-auto px-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+    <header className="bg-slate-950 border-b border-slate-800 sticky top-0 z-40 py-1.5">
+      <div className="max-w-7xl mx-auto px-4 flex flex-col lg:flex-row lg:items-start justify-between gap-2">
         {/* Brand Zone */}
-        <div className="flex items-center justify-between md:justify-start gap-4 w-full lg:w-auto shrink-0 flex-wrap sm:flex-nowrap">
-          <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-start justify-between md:justify-start gap-3 w-full lg:w-auto shrink-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2.5 shrink-0">
             {logo && logo.data && !logoLoadError ? (
               <img
                 src={logo.data}
                 alt="Voya Lanka Tours (Pvt) Ltd."
                 onError={() => setLogoLoadError(true)}
-                className="h-11 sm:h-12 w-auto max-w-[150px] object-contain rounded-lg bg-white p-1 shadow-sm shrink-0"
+                className="h-9 sm:h-10 w-auto max-w-[140px] object-contain rounded-lg bg-white p-0.5 shadow-sm shrink-0"
               />
             ) : (
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-sky-700 to-teal-600 flex items-center justify-center text-white shadow-md shadow-sky-900/40 shrink-0">
-                <Plane className="w-5 h-5 -rotate-45" />
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-sky-700 to-teal-600 flex items-center justify-center text-white shadow-md shadow-sky-900/40 shrink-0">
+                <Plane className="w-4 h-4 -rotate-45" />
               </div>
             )}
             <div className="flex flex-col shrink-0">
-              <h1 className="text-sm sm:text-base font-bold leading-tight tracking-tight text-slate-100 whitespace-nowrap">
+              <h1 className="text-sm font-bold leading-tight tracking-tight text-slate-100 whitespace-nowrap">
                 Voya Lanka Tours (Pvt) Ltd.
               </h1>
-              <p className="text-[10px] font-medium italic tracking-wider text-amber-400 uppercase mt-0.5 leading-tight whitespace-nowrap">
+              <p className="text-[9.5px] font-medium italic tracking-wider text-amber-400 uppercase leading-tight whitespace-nowrap">
                 MORE THAN A DESTINATION
               </p>
             </div>
           </div>
 
           {/* User Account & Cloud Sync Status Badge */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 pt-0.5">
             {currentUser ? (
-              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 shadow-sm">
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 shadow-sm">
                 <div
                   className={`w-2 h-2 rounded-full ${
                     syncStatus === 'syncing'
@@ -175,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
                 />
                 <div className="flex flex-col text-left">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-200 max-w-[120px] truncate">
+                    <span className="text-[11px] font-bold text-slate-200 max-w-[115px] truncate">
                       {currentUser.fullName || currentUser.email}
                     </span>
                     <span
@@ -193,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {currentUser.role === 'ADMIN' && (
                   <button
                     onClick={onOpenUserManagement}
-                    className="p-1 hover:bg-slate-800 rounded-lg text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                    className="p-0.5 hover:bg-slate-800 rounded-md text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
                     title="Manage Staff Users & Roles"
                   >
                     <Users className="w-3.5 h-3.5" />
@@ -202,16 +202,16 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <button
                   onClick={onOpenChangePassword}
-                  className="flex items-center gap-1 px-1.5 py-1 hover:bg-slate-800 rounded-lg text-sky-400 hover:text-sky-300 transition-colors cursor-pointer text-[11px] font-medium"
+                  className="flex items-center gap-1 px-1 py-0.5 hover:bg-slate-800 rounded-md text-sky-400 hover:text-sky-300 transition-colors cursor-pointer text-[11px] font-medium"
                   title="Change Account Password"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
-                  <span className="hidden lg:inline">Password</span>
+                  <span className="hidden xl:inline">Password</span>
                 </button>
 
                 <button
                   onClick={onSignOut}
-                  className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                  className="p-0.5 hover:bg-slate-800 rounded-md text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
                   title="Sign Out"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -220,7 +220,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <button
                 onClick={onOpenAuth}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-900/30 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-900/30 transition-colors cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In</span>
@@ -229,27 +229,27 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Action Controls - Two Rows matching reference */}
-        <div className="flex flex-col items-start lg:items-end gap-2">
-          {/* Top Row: Itinerary, Saved, Customers, Share Proposal, Backup & Restore, Demo, Reset, Logo */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        {/* Action Controls - Compact Two Rows */}
+        <div className="flex flex-col items-start lg:items-end gap-1.5">
+          {/* Top Row: Itinerary, Saved, Overall Profit, Customers, Hotel Rates, Share Proposal, Backup & Restore */}
+          <div className="flex items-center gap-1.5 flex-wrap lg:justify-end">
             <button
               onClick={onOpenItinerary}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-300 transition-colors cursor-pointer whitespace-nowrap"
               title="Tour itinerary schedule"
             >
-              <Route className="w-3.5 h-3.5" />
+              <Route className="w-3 h-3" />
               <span>Itinerary</span>
             </button>
 
             <button
               onClick={onOpenSaved}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-amber-300 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-amber-300 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               title="Saved quotations"
             >
-              <FolderOpen className="w-3.5 h-3.5" />
+              <FolderOpen className="w-3 h-3" />
               <span>Saved</span>
-              <span className="bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+              <span className="bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 rounded-full leading-tight">
                 {savedCount}
               </span>
             </button>
@@ -257,12 +257,12 @@ export const Header: React.FC<HeaderProps> = ({
             {onOpenOverallProfit && (
               <button
                 onClick={onOpenOverallProfit}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-700/80 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-emerald-700/80 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 title="Check overall quoted price and actual profit for confirmed tours"
               >
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <TrendingUp className="w-3 h-3 text-emerald-400" />
                 <span>Overall Profit</span>
-                <span className="text-[11px] font-mono tabular-nums text-emerald-200">
+                <span className="text-[10px] font-mono tabular-nums text-emerald-200">
                   · {confirmedCount}
                 </span>
               </button>
@@ -270,12 +270,12 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={onOpenCustomers}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-purple-800/80 bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-purple-800/80 bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 transition-colors cursor-pointer whitespace-nowrap"
               title="Customer database and directory"
             >
-              <Users className="w-3.5 h-3.5 text-purple-400" />
+              <Users className="w-3 h-3 text-purple-400" />
               <span>Customers</span>
-              <span className="bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+              <span className="bg-indigo-600 text-white text-[10px] font-bold px-1.5 rounded-full leading-tight">
                 {customerCount}
               </span>
             </button>
@@ -283,13 +283,13 @@ export const Header: React.FC<HeaderProps> = ({
             {onOpenHotelRates && (
               <button
                 onClick={onOpenHotelRates}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-teal-800/80 bg-teal-950/40 hover:bg-teal-900/60 text-teal-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-teal-800/80 bg-teal-950/40 hover:bg-teal-900/60 text-teal-300 transition-colors cursor-pointer whitespace-nowrap"
                 title="Hotel contract rates and Excel auto-pricing"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-teal-400" />
+                <FileSpreadsheet className="w-3 h-3 text-teal-400" />
                 <span>Hotel Rates</span>
                 {hotelRatesCount > 0 && (
-                  <span className="bg-teal-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                  <span className="bg-teal-600 text-white text-[10px] font-bold px-1.5 rounded-full leading-tight">
                     {hotelRatesCount}
                   </span>
                 )}
@@ -298,46 +298,49 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={onPreviewOnlineProposal}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-500/80 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-emerald-500/80 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 transition-colors cursor-pointer whitespace-nowrap"
               title="Create shareable web link and preview proposal"
             >
-              <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+              <Share2 className="w-3 h-3 text-emerald-400" />
               <span>Share Proposal</span>
             </button>
 
             <button
               onClick={onOpenBackup}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-sky-500/80 bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-sky-500/80 bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 transition-colors cursor-pointer whitespace-nowrap"
               title="Database Backup & Restore"
             >
-              <Database className="w-3.5 h-3.5 text-sky-400" />
+              <Database className="w-3 h-3 text-sky-400" />
               <span>Backup &amp; Restore</span>
             </button>
+          </div>
 
+          {/* Second Row: Audit Logs, Demo, Reset, Logo, Company, PDF, Excel, Print */}
+          <div className="flex items-center gap-1.5 flex-wrap lg:justify-end">
             <button
               onClick={onOpenActivityLogs}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-amber-500/80 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-amber-500/80 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 transition-colors cursor-pointer whitespace-nowrap"
               title="User Activity & Audit Logs"
             >
-              <History className="w-3.5 h-3.5 text-amber-400" />
+              <History className="w-3 h-3 text-amber-400" />
               <span>Audit Logs</span>
             </button>
 
             <button
               onClick={onLoadDemo}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
               title="Load sample tour configuration"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <Sparkles className="w-3 h-3 text-amber-400" />
               <span>Demo</span>
             </button>
 
             <button
               onClick={onReset}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
               title="Reset form to defaults"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3 h-3" />
               <span>Reset</span>
             </button>
 
@@ -353,61 +356,58 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-400 transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-400 transition-colors cursor-pointer whitespace-nowrap"
                   title="Upload official company logo (synced for all users & PDFs)"
                 >
-                  <ImageIcon className="w-3.5 h-3.5" />
+                  <ImageIcon className="w-3 h-3" />
                   <span>Logo</span>
                 </button>
 
                 {logo && (
                   <button
                     onClick={onLogoRemove}
-                    className="p-1.5 text-xs font-semibold rounded-lg border border-rose-900/60 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 transition-colors cursor-pointer"
+                    className="p-1 text-[11px] font-semibold rounded-md border border-rose-900/60 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 transition-colors cursor-pointer"
                     title="Remove company logo for all users"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 )}
               </>
             )}
-          </div>
 
-          {/* Second Row: Company, PDF, Excel, Print (right aligned) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 justify-end self-end">
             <button
               onClick={onOpenCompany}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-400 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-sky-400 transition-colors cursor-pointer whitespace-nowrap"
               title="Edit company profile and contact details"
             >
-              <Building2 className="w-3.5 h-3.5" />
+              <Building2 className="w-3 h-3" />
               <span>Company</span>
             </button>
 
             <button
               onClick={onDownloadPDF}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-md bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors cursor-pointer whitespace-nowrap"
               title="Download PDF Quotation"
             >
-              <FileText className="w-3.5 h-3.5 text-white" />
+              <FileText className="w-3 h-3 text-white" />
               <span>PDF</span>
             </button>
 
             <button
               onClick={onExportExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-emerald-400 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-emerald-400 transition-colors cursor-pointer whitespace-nowrap"
               title="Export everything to multi-sheet Excel (.xlsx)"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <FileSpreadsheet className="w-3 h-3" />
               <span>Excel</span>
             </button>
 
             <button
               onClick={onPrint}
-              className="p-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
+              className="p-1 text-[11px] font-semibold rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
               title="Print quotation"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="w-3 h-3" />
             </button>
           </div>
         </div>
