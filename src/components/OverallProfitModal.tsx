@@ -78,8 +78,8 @@ export const OverallProfitModal: React.FC<OverallProfitModalProps> = ({
     let totalPax = 0;
 
     filteredRows.forEach(({ quote, fin }) => {
-      totalQuotedLkr += fin.quotedPriceLkr;
-      totalQuotedUsd += fin.quotedTotalUsd;
+      totalQuotedLkr += fin.adjustedQuotedPriceLkr;
+      totalQuotedUsd += fin.adjustedTotalUsd;
       totalRevenueActiveLkr += fin.revenueAtActiveRateLkr;
       totalQuotedCostLkr += fin.quotedCostSubtotalLkr;
       totalQuotedCostUsd += fin.quotedCostSubtotalUsd;
@@ -177,8 +177,8 @@ export const OverallProfitModal: React.FC<OverallProfitModalProps> = ({
         quote.customer?.travelDate || '',
         quote.pax?.days || 1,
         paxCount,
-        fin.quotedTotalUsd.toFixed(2),
-        Math.round(fin.quotedPriceLkr),
+        fin.adjustedTotalUsd.toFixed(2),
+        Math.round(fin.adjustedQuotedPriceLkr),
         Math.round(fin.netQuotedMarginLkr),
         fin.activeRate,
         fin.hasActualsEntered ? Math.round(fin.totalActualCostLkr) : 'Pending',
@@ -510,11 +510,21 @@ export const OverallProfitModal: React.FC<OverallProfitModalProps> = ({
 
                               <td className="py-3 px-3 text-right font-mono tabular-nums whitespace-nowrap">
                                 <span className="font-bold text-teal-300 block">
-                                  {formatUSD(fin.quotedTotalUsd)}
+                                  {formatUSD(fin.adjustedTotalUsd)}
                                 </span>
                                 <span className="text-[11px] text-slate-300 block">
-                                  {formatLKR(fin.quotedPriceLkr)}
+                                  {formatLKR(fin.adjustedQuotedPriceLkr)}
                                 </span>
+                                {fin.totalCustomerUpgradeUsd > 0 && (
+                                  <span className="text-[10px] text-amber-300 block">
+                                    +{formatUSD(fin.totalCustomerUpgradeUsd)} upgrade
+                                  </span>
+                                )}
+                                {fin.totalCustomerUpgradeUsd === 0 && fin.focAdjustmentCount > 0 && (
+                                  <span className="text-[10px] text-emerald-400 block">
+                                    FOC hotel upgrade
+                                  </span>
+                                )}
                               </td>
 
                               <td className="py-3 px-3 text-right font-mono tabular-nums whitespace-nowrap">

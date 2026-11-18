@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeftRight,
   Check,
   CheckCircle2,
   CheckSquare,
@@ -17,11 +18,13 @@ import {
 import {
   ActualExpenseItem,
   ChecklistCostEntry,
+  ChecklistHotelAdjustment,
   QuotationChecklistData,
   SavedQuotation
 } from '../types';
 import { formatLKR, formatUSD } from '../utils/calc';
 import { computeTourFinancials } from '../utils/profitCalc';
+import { getAllPartnerHotels } from '../utils/storage';
 
 interface QuotationChecklistModalProps {
   isOpen: boolean;
@@ -36,6 +39,14 @@ interface ExtractedHotelStay {
   hotelName: string;
   nights: number[];
   roomsCount: number;
+  changeNotes: string[];
+}
+
+interface QuotedStayOption {
+  key: string;
+  nightNumber: number;
+  hotelName: string;
+  detailsLabel: string;
 }
 
 function buildDefaultChecklist(quote: SavedQuotation): QuotationChecklistData {
@@ -55,6 +66,9 @@ function buildDefaultChecklist(quote: SavedQuotation): QuotationChecklistData {
     actualCosts: existing?.actualCosts ? { ...existing.actualCosts } : {},
     otherExpenses: existing?.otherExpenses
       ? existing.otherExpenses.map(e => ({ ...e }))
+      : [],
+    hotelAdjustments: existing?.hotelAdjustments
+      ? existing.hotelAdjustments.map(a => ({ ...a }))
       : [],
     notes: existing?.notes ?? '',
     updatedAt: existing?.updatedAt
@@ -84,39 +98,119 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
     return computeTourFinancials(quote, checklist);
   }, [quote, checklist]);
 
-  // Automatically extract hotels included in the quotation
+  const partnerHotelOptions = useMemo(() => {
+    if (!isOpen) return [];
+    return getAllPartnerHotels().map(h => `${h.name} - ${h.destination}`);
+  }, [isOpen]);
+
+  // Quoted night stay options for Hotel Change / Upgrade selector
+  const quotedStayOptions = useMemo<QuotedStayOption[]>(() => {
+    if (!quote) return [];
+    const days = Math.max(0, quote.pax?.days || 0);
+    const nightCount = days > 0 ? Math.max(0, days - 1) : (quote.nights || []).length;
+    const activeNights = (quote.nights || []).slice(0, nightCount || (quote.nights || []).length);
+    const opts: QuotedStayOption[] = [];
+
+    activeNights.forEach((night, i) => {
+      const nNum = night.nightNumber || i + 1;
+      (night.rooms || []).forEach((room, rIdx) => {
+        const hotelName = (room.hotel || '').trim();
+        if (!hotelName) return;
+        const detailsLabel = [room.roomCategory, room.bedType, room.meal, room.roomView]
+          .filter(Boolean)
+          .join(' · ');
+        opts.push({
+          key: `night_${i}_room_${rIdx}_${room.id || rIdx}`,
+          nightNumber: nNum,
+          hotelName,
+          detailsLabel
+        });
+      });
+    });
+
+    return opts;
+  }, [quote]);
+
+  // Automatically extract hotels included in the quotation (reflecting any hotel changes or upgrades)
   const hotelStays = useMemo<ExtractedHotelStay[]>(() => {
     if (!quote) return [];
     const days = Math.max(0, quote.pax?.days || 0);
     const nightCount = days > 0 ? Math.max(0, days - 1) : (quote.nights || []).length;
     const activeNights = (quote.nights || []).slice(0, nightCount || (quote.nights || []).length);
+    const adjustments = checklist?.hotelAdjustments || [];
 
     const map = new Map<string, ExtractedHotelStay>();
     activeNights.forEach((night, nIdx) => {
       const nNum = night.nightNumber || nIdx + 1;
-      (night.rooms || []).forEach(room => {
-        const hotelName = (room.hotel || '').trim();
-        if (!hotelName) return;
-        const normKey = hotelName.toLowerCase();
+      (night.rooms || []).forEach((room, rIdx) => {
+        const origHotel = (room.hotel || '').trim();
+        if (!origHotel) return;
+        const roomKey = `night_${nIdx}_room_${rIdx}_${room.id || rIdx}`;
+        const matchingAdj = adjustments.find(a => a.nightKey === roomKey);
+
+        let effectiveHotel = origHotel;
+        let changeNote = '';
+        if (matchingAdj) {
+          const billingLabel =
+            matchingAdj.billingMode === 'FOC'
+              ? 'FOC'
+              : `+${matchingAdj.customerChargeCurrency} ${Number(matchingAdj.customerChargeAmount || 0).toLocaleString()}`;
+          if (
+            matchingAdj.changeType === 'HOTEL_CHANGE' &&
+            matchingAdj.updatedHotel.trim()
+          ) {
+            effectiveHotel = matchingAdj.updatedHotel.trim();
+            changeNote = `Changed from ${origHotel} (${billingLabel})`;
+          } else if (matchingAdj.changeType === 'SAME_HOTEL_UPGRADE') {
+            changeNote = `Same-hotel upgrade: ${matchingAdj.updatedDetails || 'Upgraded'} (${billingLabel})`;
+          }
+        }
+
+        const normKey = effectiveHotel.toLowerCase();
         const existing = map.get(normKey);
         if (existing) {
           if (!existing.nights.includes(nNum)) {
             existing.nights.push(nNum);
           }
           existing.roomsCount += 1;
+          if (changeNote && !existing.changeNotes.includes(changeNote)) {
+            existing.changeNotes.push(changeNote);
+          }
         } else {
           map.set(normKey, {
             key: normKey,
-            hotelName,
+            hotelName: effectiveHotel,
             nights: [nNum],
-            roomsCount: 1
+            roomsCount: 1,
+            changeNotes: changeNote ? [changeNote] : []
           });
         }
       });
     });
 
+    // Include custom multi-night hotel changes not tied to a single roomKey
+    adjustments
+      .filter(a => a.nightKey === 'custom' && a.changeType === 'HOTEL_CHANGE' && a.updatedHotel.trim())
+      .forEach(adj => {
+        const normKey = adj.updatedHotel.trim().toLowerCase();
+        const billingLabel =
+          adj.billingMode === 'FOC'
+            ? 'FOC'
+            : `+${adj.customerChargeCurrency} ${Number(adj.customerChargeAmount || 0).toLocaleString()}`;
+        const note = `Added / Changed hotel (${billingLabel})`;
+        if (!map.has(normKey)) {
+          map.set(normKey, {
+            key: normKey,
+            hotelName: adj.updatedHotel.trim(),
+            nights: adj.nightNumber ? [adj.nightNumber] : [],
+            roomsCount: 1,
+            changeNotes: [note]
+          });
+        }
+      });
+
     return Array.from(map.values());
-  }, [quote]);
+  }, [quote, checklist?.hotelAdjustments]);
 
   if (!isOpen || !quote || !checklist || !financials) return null;
 
@@ -134,6 +228,12 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
     netQuotedMarginLkr,
     netQuotedMarginUsd,
     quotedTotalUsd,
+    quotedRevenueAtActiveRateLkr,
+    totalCustomerUpgradeLkr,
+    totalCustomerUpgradeUsd,
+    focAdjustmentCount,
+    chargedAdjustmentCount,
+    adjustedTotalUsd,
     revenueAtActiveRateLkr,
     advanceLkr,
     advanceUsd,
@@ -246,6 +346,56 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
     });
   };
 
+  const handleAddHotelAdjustment = () => {
+    const firstStay = quotedStayOptions[0];
+    setChecklist(prev => {
+      if (!prev) return prev;
+      const newAdj: ChecklistHotelAdjustment = {
+        id: 'hadj_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        nightKey: firstStay ? firstStay.key : 'custom',
+        nightNumber: firstStay ? firstStay.nightNumber : undefined,
+        changeType: 'HOTEL_CHANGE',
+        quotedHotel: firstStay ? firstStay.hotelName : '',
+        quotedRoomDetails: firstStay ? firstStay.detailsLabel : '',
+        updatedHotel: '',
+        updatedDetails: '',
+        billingMode: 'FOC',
+        customerChargeAmount: 0,
+        customerChargeCurrency: 'USD',
+        notes: ''
+      };
+      return {
+        ...prev,
+        hotelAdjustments: [...(prev.hotelAdjustments || []), newAdj]
+      };
+    });
+  };
+
+  const handleUpdateHotelAdjustment = (
+    id: string,
+    patch: Partial<ChecklistHotelAdjustment>
+  ) => {
+    setChecklist(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        hotelAdjustments: (prev.hotelAdjustments || []).map(adj =>
+          adj.id === id ? { ...adj, ...patch } : adj
+        )
+      };
+    });
+  };
+
+  const handleRemoveHotelAdjustment = (id: string) => {
+    setChecklist(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        hotelAdjustments: (prev.hotelAdjustments || []).filter(adj => adj.id !== id)
+      };
+    });
+  };
+
   const handleToggleConfirmed = async () => {
     if (!checklist) return;
     const nextConfirmed = !isConfirmed;
@@ -289,6 +439,7 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
   const vouchersSentCount = hotelStays.filter(
     h => !!checklist.hotelVouchers[h.key]
   ).length;
+  const hotelAdjustments = checklist.hotelAdjustments || [];
 
   return (
     <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-5">
@@ -410,12 +561,15 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block mb-0.5">Quoted Package Total</span>
+                <span className="text-slate-400 block mb-0.5">
+                  {totalCustomerUpgradeUsd > 0 ? 'Adjusted Customer Total' : 'Quoted Package Total'}
+                </span>
                 <span className="font-bold text-teal-300 font-mono tabular-nums block">
-                  {formatUSD(quotedTotalUsd)}
+                  {formatUSD(adjustedTotalUsd)}
                 </span>
                 <span className="text-[11px] text-slate-300 font-mono tabular-nums">
-                  {formatLKR(breakdown.fin)}
+                  {formatLKR(revenueAtActiveRateLkr)}
+                  {totalCustomerUpgradeUsd > 0 ? ` (incl. +${formatUSD(totalCustomerUpgradeUsd)})` : ''}
                 </span>
               </div>
             </div>
@@ -540,11 +694,18 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
                             <span className="text-xs font-medium text-slate-100 block truncate">
                               {hotel.hotelName}
                             </span>
-                            <span className="text-[11px] text-slate-400">
-                              Night{hotel.nights.length > 1 ? 's' : ''} {hotel.nights.join(', ')} ·{' '}
+                            <span className="text-[11px] text-slate-400 block">
+                              {hotel.nights.length > 0
+                                ? `Night${hotel.nights.length > 1 ? 's' : ''} ${hotel.nights.join(', ')} · `
+                                : ''}
                               {hotel.roomsCount} room entry
                               {hotel.roomsCount > 1 ? ' entries' : ''}
                             </span>
+                            {hotel.changeNotes.length > 0 && (
+                              <span className="text-[11px] text-amber-300 block truncate">
+                                {hotel.changeNotes.join(' · ')}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span
@@ -647,11 +808,27 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
 
               <div className="border-t border-slate-800 pt-3.5 space-y-2 text-xs">
                 <div className="flex items-center justify-between text-slate-400">
-                  <span>Tour Package Total (at active rate)</span>
+                  <span>Quoted Package Total (at active rate)</span>
                   <span className="font-mono tabular-nums text-slate-200 font-semibold">
-                    {formatUSD(quotedTotalUsd)} · {formatLKR(revenueAtActiveRateLkr)}
+                    {formatUSD(quotedTotalUsd)} · {formatLKR(quotedRevenueAtActiveRateLkr)}
                   </span>
                 </div>
+                {totalCustomerUpgradeLkr > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-amber-300">
+                      <span>+ Hotel Changes / Upgrades (Charged)</span>
+                      <span className="font-mono tabular-nums font-semibold">
+                        + {formatUSD(totalCustomerUpgradeUsd)} · {formatLKR(totalCustomerUpgradeLkr)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-200">
+                      <span className="font-medium">Adjusted Customer Total</span>
+                      <span className="font-mono tabular-nums font-bold">
+                        {formatUSD(adjustedTotalUsd)} · {formatLKR(revenueAtActiveRateLkr)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center justify-between text-slate-400">
                   <span>Advance Received</span>
                   <span className="font-mono tabular-nums text-emerald-400 font-semibold">
@@ -683,6 +860,311 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
               </div>
             </section>
           </div>
+
+          {/* 2.5 Hotel Changes & Same-Hotel Upgrades (FOC or Charged to Customer) */}
+          <section className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
+            <datalist id="checklist-partner-hotels">
+              {partnerHotelOptions.map(h => (
+                <option key={h} value={h} />
+              ))}
+            </datalist>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+              <div className="flex items-start gap-2.5">
+                <ArrowLeftRight className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-100">
+                    Hotel Changes &amp; Same-Hotel Upgrades
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Record hotel changes or same-hotel room/meal upgrades — either Free of Charge (FOC) or charged to the customer.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddHotelAdjustment}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5 text-amber-400" />
+                <span>Add Hotel Change / Upgrade</span>
+              </button>
+            </div>
+
+            {hotelAdjustments.length > 0 ? (
+              <div className="space-y-3">
+                {hotelAdjustments.map(adj => {
+                  const isChargeCustomer = adj.billingMode === 'CHARGE_CUSTOMER';
+                  const chargeLkr = isChargeCustomer
+                    ? toLkr(Number(adj.customerChargeAmount) || 0, adj.customerChargeCurrency)
+                    : 0;
+                  const chargeUsd = isChargeCustomer
+                    ? toUsd(Number(adj.customerChargeAmount) || 0, adj.customerChargeCurrency)
+                    : 0;
+
+                  return (
+                    <div
+                      key={adj.id}
+                      className="bg-slate-900/70 border border-slate-800 rounded-xl p-3 space-y-3"
+                    >
+                      {/* Top row: Change Type toggle, Affected Stay selector, Billing Mode toggle, Delete */}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="inline-flex rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateHotelAdjustment(adj.id, {
+                                  changeType: 'HOTEL_CHANGE'
+                                })
+                              }
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                adj.changeType === 'HOTEL_CHANGE'
+                                  ? 'bg-sky-600 text-white'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              Hotel Change
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateHotelAdjustment(adj.id, {
+                                  changeType: 'SAME_HOTEL_UPGRADE',
+                                  updatedHotel: adj.quotedHotel || adj.updatedHotel
+                                })
+                              }
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                adj.changeType === 'SAME_HOTEL_UPGRADE'
+                                  ? 'bg-teal-600 text-white'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              Same-Hotel Upgrade
+                            </button>
+                          </div>
+
+                          <select
+                            aria-label="Affected quoted stay"
+                            value={adj.nightKey}
+                            onChange={e => {
+                              const selectedKey = e.target.value;
+                              const opt = quotedStayOptions.find(o => o.key === selectedKey);
+                              handleUpdateHotelAdjustment(adj.id, {
+                                nightKey: selectedKey,
+                                nightNumber: opt ? opt.nightNumber : undefined,
+                                quotedHotel: opt ? opt.hotelName : '',
+                                quotedRoomDetails: opt ? opt.detailsLabel : '',
+                                ...(adj.changeType === 'SAME_HOTEL_UPGRADE'
+                                  ? { updatedHotel: opt ? opt.hotelName : '' }
+                                  : {})
+                              });
+                            }}
+                            className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 max-w-xs focus:outline-none focus:border-sky-500 cursor-pointer"
+                          >
+                            {quotedStayOptions.map(opt => (
+                              <option key={opt.key} value={opt.key}>
+                                Night {opt.nightNumber}: {opt.hotelName}
+                                {opt.detailsLabel ? ` (${opt.detailsLabel})` : ''}
+                              </option>
+                            ))}
+                            <option value="custom">Other / Multiple Nights</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="inline-flex rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateHotelAdjustment(adj.id, {
+                                  billingMode: 'FOC',
+                                  customerChargeAmount: 0
+                                })
+                              }
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                adj.billingMode === 'FOC'
+                                  ? 'bg-emerald-700 text-white'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              FOC (Free of Charge)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateHotelAdjustment(adj.id, {
+                                  billingMode: 'CHARGE_CUSTOMER'
+                                })
+                              }
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                                adj.billingMode === 'CHARGE_CUSTOMER'
+                                  ? 'bg-amber-600 text-white'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              Charge Customer
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveHotelAdjustment(adj.id)}
+                            aria-label="Remove hotel adjustment"
+                            className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-md transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Details & Charge Inputs */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-start">
+                        {adj.changeType === 'HOTEL_CHANGE' ? (
+                          <div className="md:col-span-4">
+                            <label className="block text-[11px] text-slate-400 mb-1">
+                              New Hotel Name {adj.quotedHotel ? `(Replaces ${adj.quotedHotel})` : ''}
+                            </label>
+                            <input
+                              type="text"
+                              list="checklist-partner-hotels"
+                              value={adj.updatedHotel}
+                              placeholder="Select or enter new hotel name"
+                              onChange={e =>
+                                handleUpdateHotelAdjustment(adj.id, {
+                                  updatedHotel: e.target.value
+                                })
+                              }
+                              className="w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+                            />
+                          </div>
+                        ) : (
+                          <div className="md:col-span-4">
+                            <label className="block text-[11px] text-slate-400 mb-1">
+                              Hotel (Same-Hotel Upgrade)
+                            </label>
+                            <input
+                              type="text"
+                              value={adj.quotedHotel || adj.updatedHotel}
+                              placeholder="Same hotel stay"
+                              readOnly={Boolean(adj.quotedHotel)}
+                              onChange={e =>
+                                handleUpdateHotelAdjustment(adj.id, {
+                                  updatedHotel: e.target.value
+                                })
+                              }
+                              className="w-full bg-slate-950/70 border border-slate-800 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-500"
+                            />
+                          </div>
+                        )}
+
+                        <div className="md:col-span-4">
+                          <label className="block text-[11px] text-slate-400 mb-1">
+                            {adj.changeType === 'SAME_HOTEL_UPGRADE'
+                              ? 'Upgraded Room / Meal / View'
+                              : 'New Room / Meal Details & Note'}
+                          </label>
+                          <input
+                            type="text"
+                            value={adj.updatedDetails}
+                            placeholder={
+                              adj.changeType === 'SAME_HOTEL_UPGRADE'
+                                ? 'e.g. Upgraded to Deluxe Sea View · Half-Board'
+                                : 'e.g. Deluxe Room · HB (Guest requested change)'
+                            }
+                            onChange={e =>
+                              handleUpdateHotelAdjustment(adj.id, {
+                                updatedDetails: e.target.value
+                              })
+                            }
+                            className="w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+                          />
+                        </div>
+
+                        <div className="md:col-span-4">
+                          {isChargeCustomer ? (
+                            <div>
+                              <label className="block text-[11px] text-amber-300 font-medium mb-1">
+                                Extra Charge Billed to Customer
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  aria-label="Customer upgrade charge currency"
+                                  value={adj.customerChargeCurrency}
+                                  onChange={e =>
+                                    handleUpdateHotelAdjustment(adj.id, {
+                                      customerChargeCurrency: e.target.value as 'LKR' | 'USD'
+                                    })
+                                  }
+                                  className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
+                                >
+                                  <option value="USD">USD</option>
+                                  <option value="LKR">LKR</option>
+                                </select>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={adj.customerChargeAmount || ''}
+                                  placeholder="0"
+                                  onChange={e =>
+                                    handleUpdateHotelAdjustment(adj.id, {
+                                      customerChargeAmount: Math.max(
+                                        0,
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    })
+                                  }
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs font-mono font-bold text-amber-300 text-right tabular-nums focus:outline-none focus:border-sky-500"
+                                />
+                              </div>
+                              <span className="block text-[10px] text-slate-400 font-mono tabular-nums text-right mt-0.5">
+                                ≈ {adj.customerChargeCurrency === 'USD' ? formatLKR(chargeLkr) : formatUSD(chargeUsd)} added to customer total
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="block text-[11px] text-emerald-400 font-medium mb-1">
+                                Customer Billing: Free of Charge (FOC)
+                              </label>
+                              <input
+                                type="text"
+                                value={adj.notes || ''}
+                                placeholder="Optional reason (e.g. Complimentary upgrade / Hotel relocated FOC)"
+                                onChange={e =>
+                                  handleUpdateHotelAdjustment(adj.id, {
+                                    notes: e.target.value
+                                  })
+                                }
+                                className="w-full bg-slate-950 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-300">
+                  <span>
+                    {focAdjustmentCount} FOC · {chargedAdjustmentCount} Charged to Customer
+                  </span>
+                  <span className="font-mono tabular-nums">
+                    Added to Customer Total:{' '}
+                    <strong className="text-amber-300">
+                      + {formatUSD(totalCustomerUpgradeUsd)}
+                    </strong>{' '}
+                    (+ {formatLKR(totalCustomerUpgradeLkr)})
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400 py-1.5">
+                No hotel changes or upgrades recorded. Use &ldquo;Add Hotel Change / Upgrade&rdquo; if a quoted hotel was swapped or upgraded (FOC or charged extra to the guest).
+              </div>
+            )}
+          </section>
 
           {/* 3. Quoted vs Actual Cost Comparison & USD Conversion Rate */}
           <section className="bg-slate-950/60 border border-slate-800 rounded-xl overflow-hidden">
@@ -759,6 +1241,7 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
                     computedRows.map(row => {
                       const hasActual = (Number(row.entry.amount) || 0) > 0;
                       const isSavings = row.diffLkr >= 0;
+                      const rowAdj = hotelAdjustments.find(a => a.nightKey === row.key);
                       return (
                         <tr
                           key={row.key}
@@ -771,6 +1254,17 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
                             <span className="text-[11px] text-slate-400 block">
                               {row.detail}
                             </span>
+                            {rowAdj && (
+                              <span className="text-[11px] text-amber-300 block mt-0.5">
+                                {rowAdj.changeType === 'HOTEL_CHANGE'
+                                  ? `Changed → ${rowAdj.updatedHotel || 'New hotel'}`
+                                  : `Same-hotel upgrade → ${rowAdj.updatedDetails || 'Upgraded'}`}{' '}
+                                ·{' '}
+                                {rowAdj.billingMode === 'FOC'
+                                  ? 'FOC to customer'
+                                  : `Charged +${rowAdj.customerChargeCurrency} ${Number(rowAdj.customerChargeAmount || 0).toLocaleString()}`}
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-2.5 px-3 text-right font-mono tabular-nums">
@@ -1051,9 +1545,14 @@ export const QuotationChecklistModal: React.FC<QuotationChecklistModalProps> = (
                 <span className="text-sm font-bold font-mono tabular-nums text-slate-100 block">
                   {formatLKR(revenueAtActiveRateLkr)}
                 </span>
-                <span className="text-[11px] font-mono tabular-nums text-slate-400">
-                  {formatUSD(quotedTotalUsd)}
+                <span className="text-[11px] font-mono tabular-nums text-slate-400 block">
+                  {formatUSD(adjustedTotalUsd)}
                 </span>
+                {totalCustomerUpgradeUsd > 0 && (
+                  <span className="text-[10px] font-mono tabular-nums text-amber-300 block mt-0.5">
+                    Quoted {formatUSD(quotedTotalUsd)} + Upgrades {formatUSD(totalCustomerUpgradeUsd)}
+                  </span>
+                )}
               </div>
 
               <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/50">

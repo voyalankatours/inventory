@@ -37,6 +37,13 @@ export interface TourFinancialSummary {
   netQuotedMarginUsd: number;
   quotedPriceLkr: number;
   quotedTotalUsd: number;
+  quotedRevenueAtActiveRateLkr: number;
+  totalCustomerUpgradeLkr: number;
+  totalCustomerUpgradeUsd: number;
+  focAdjustmentCount: number;
+  chargedAdjustmentCount: number;
+  adjustedTotalUsd: number;
+  adjustedQuotedPriceLkr: number;
   revenueAtActiveRateLkr: number;
   advanceLkr: number;
   advanceUsd: number;
@@ -202,14 +209,37 @@ export function computeTourFinancials(
 
   const quotedTotalUsd = breakdown.usd;
   const quotedPriceLkr = breakdown.fin;
-  const revenueAtActiveRateLkr = quotedTotalUsd * activeRate;
+  const quotedRevenueAtActiveRateLkr = quotedTotalUsd * activeRate;
+
+  // Hotel changes & same-hotel upgrades (FOC vs Charge Customer)
+  let totalCustomerUpgradeLkr = 0;
+  let totalCustomerUpgradeUsd = 0;
+  let focAdjustmentCount = 0;
+  let chargedAdjustmentCount = 0;
+
+  (checklist?.hotelAdjustments || []).forEach(adj => {
+    if (adj.billingMode === 'CHARGE_CUSTOMER') {
+      chargedAdjustmentCount += 1;
+      const amt = Number(adj.customerChargeAmount) || 0;
+      if (amt > 0) {
+        totalCustomerUpgradeLkr += toLkr(amt, adj.customerChargeCurrency || 'USD');
+        totalCustomerUpgradeUsd += toUsd(amt, adj.customerChargeCurrency || 'USD');
+      }
+    } else {
+      focAdjustmentCount += 1;
+    }
+  });
+
+  const adjustedTotalUsd = quotedTotalUsd + totalCustomerUpgradeUsd;
+  const adjustedQuotedPriceLkr = quotedPriceLkr + totalCustomerUpgradeLkr;
+  const revenueAtActiveRateLkr = quotedRevenueAtActiveRateLkr + totalCustomerUpgradeLkr;
 
   const advanceAmt = Number(checklist?.advanceReceived) || 0;
   const advanceCurr = checklist?.advanceCurrency || 'USD';
   const advanceLkr = toLkr(advanceAmt, advanceCurr);
   const advanceUsd = toUsd(advanceAmt, advanceCurr);
   const balanceLkr = Math.max(0, revenueAtActiveRateLkr - advanceLkr);
-  const balanceUsd = Math.max(0, quotedTotalUsd - advanceUsd);
+  const balanceUsd = Math.max(0, adjustedTotalUsd - advanceUsd);
   const isOverpaid = advanceLkr > revenueAtActiveRateLkr + 1;
 
   let totalActualItemCostLkr = 0;
@@ -267,7 +297,7 @@ export function computeTourFinancials(
   const hasActualsEntered = hasAnyActualItemCost || hasAnyOtherExpense;
 
   const actualProfitLkr = revenueAtActiveRateLkr - totalActualCostLkr;
-  const actualProfitUsd = quotedTotalUsd - totalActualCostUsd;
+  const actualProfitUsd = adjustedTotalUsd - totalActualCostUsd;
   const actualProfitPct =
     revenueAtActiveRateLkr > 0 ? (actualProfitLkr / revenueAtActiveRateLkr) * 100 : 0;
 
@@ -286,6 +316,13 @@ export function computeTourFinancials(
     netQuotedMarginUsd,
     quotedPriceLkr,
     quotedTotalUsd,
+    quotedRevenueAtActiveRateLkr,
+    totalCustomerUpgradeLkr,
+    totalCustomerUpgradeUsd,
+    focAdjustmentCount,
+    chargedAdjustmentCount,
+    adjustedTotalUsd,
+    adjustedQuotedPriceLkr,
     revenueAtActiveRateLkr,
     advanceLkr,
     advanceUsd,

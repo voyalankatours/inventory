@@ -164,6 +164,21 @@ export interface ActualExpenseItem {
   currency: 'LKR' | 'USD';
 }
 
+export interface ChecklistHotelAdjustment {
+  id: string;
+  nightKey: string;
+  nightNumber?: number;
+  changeType: 'HOTEL_CHANGE' | 'SAME_HOTEL_UPGRADE';
+  quotedHotel: string;
+  quotedRoomDetails?: string;
+  updatedHotel: string;
+  updatedDetails: string;
+  billingMode: 'FOC' | 'CHARGE_CUSTOMER';
+  customerChargeAmount: number;
+  customerChargeCurrency: 'LKR' | 'USD';
+  notes?: string;
+}
+
 export interface QuotationChecklistData {
   itinerarySent: boolean;
   quotationSent: boolean;
@@ -173,6 +188,7 @@ export interface QuotationChecklistData {
   actualUsdRate: number;
   actualCosts: Record<string, ChecklistCostEntry>;
   otherExpenses: ActualExpenseItem[];
+  hotelAdjustments?: ChecklistHotelAdjustment[];
   notes?: string;
   updatedAt?: string;
 }
