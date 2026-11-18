@@ -1459,6 +1459,19 @@ export async function fetchActivityLogs(limit = 100): Promise<ActivityLog[]> {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function isMissingActivityTableError(err: any): boolean {
+  if (!err) return false;
+  const code = String(err.code || '');
+  const msg = String(err.message || '').toLowerCase();
+  return (
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    msg.includes('could not find the table') ||
+    msg.includes('does not exist') ||
+    msg.includes('schema cache')
+  );
+}
+
 export async function deleteActivityLogFromCloud(
   id: string
 ): Promise<{ success: boolean; message: string }> {
@@ -1471,17 +1484,19 @@ export async function deleteActivityLogFromCloud(
         .select('id');
 
       if (error) {
-        console.error('Error deleting activity log from Supabase:', error);
-        if (error.code === '42501' || error.message.toLowerCase().includes('row-level security')) {
-          return {
-            success: false,
-            message: 'Permission denied: Only administrators can delete audit logs.'
-          };
+        if (isMissingActivityTableError(error)) {
+          console.warn('Supabase activity_logs table not found; deleting local log entry only.');
+        } else {
+          console.error('Error deleting activity log from Supabase:', error);
+          if (error.code === '42501' || error.message.toLowerCase().includes('row-level security')) {
+            return {
+              success: false,
+              message: 'Permission denied: Only administrators can delete audit logs.'
+            };
+          }
+          return { success: false, message: error.message };
         }
-        return { success: false, message: error.message };
-      }
-
-      if (!deletedRows || deletedRows.length === 0) {
+      } else if (!deletedRows || deletedRows.length === 0) {
         const { data: stillExists } = await supabase
           .from('activity_logs')
           .select('id')
@@ -1497,8 +1512,10 @@ export async function deleteActivityLogFromCloud(
         }
       }
     } catch (err: any) {
-      console.error('Failed to delete activity log:', err);
-      return { success: false, message: err.message || 'Could not delete audit log.' };
+      if (!isMissingActivityTableError(err)) {
+        console.error('Failed to delete activity log:', err);
+        return { success: false, message: err.message || 'Could not delete audit log.' };
+      }
     }
   }
 
@@ -1519,6 +1536,7 @@ export async function clearActivityLogsFromCloud(
           // Batch in chunks of 40 so query URL length never exceeds limits
           const chunkSize = 40;
           let totalDeleted = 0;
+          let tableMissing = false;
           for (let i = 0; i < uuidIds.length; i += chunkSize) {
             const chunk = uuidIds.slice(i, i + chunkSize);
             const { data: deletedRows, error } = await supabase
@@ -1528,6 +1546,10 @@ export async function clearActivityLogsFromCloud(
               .select('id');
 
             if (error) {
+              if (isMissingActivityTableError(error)) {
+                tableMissing = true;
+                break;
+              }
               if (error.code === '42501' || error.message.toLowerCase().includes('row-level security')) {
                 return {
                   success: false,
@@ -1539,7 +1561,7 @@ export async function clearActivityLogsFromCloud(
             totalDeleted += deletedRows?.length || 0;
           }
 
-          if (totalDeleted === 0) {
+          if (!tableMissing && totalDeleted === 0) {
             const { data: stillExists } = await supabase
               .from('activity_logs')
               .select('id')
@@ -1563,16 +1585,18 @@ export async function clearActivityLogsFromCloud(
           .select('id');
 
         if (error) {
-          if (error.code === '42501' || error.message.toLowerCase().includes('row-level security')) {
-            return {
-              success: false,
-              message: 'Permission denied: Only administrators can clear audit logs.'
-            };
+          if (isMissingActivityTableError(error)) {
+            console.warn('Supabase activity_logs table not found; clearing local audit logs only.');
+          } else {
+            if (error.code === '42501' || error.message.toLowerCase().includes('row-level security')) {
+              return {
+                success: false,
+                message: 'Permission denied: Only administrators can clear audit logs.'
+              };
+            }
+            return { success: false, message: error.message };
           }
-          return { success: false, message: error.message };
-        }
-
-        if (!deletedRows || deletedRows.length === 0) {
+        } else if (!deletedRows || deletedRows.length === 0) {
           const { data: stillExists } = await supabase
             .from('activity_logs')
             .select('id')
@@ -1588,8 +1612,10 @@ export async function clearActivityLogsFromCloud(
         }
       }
     } catch (err: any) {
-      console.error('Failed to clear activity logs:', err);
-      return { success: false, message: err.message || 'Could not clear audit logs.' };
+      if (!isMissingActivityTableError(err)) {
+        console.error('Failed to clear activity logs:', err);
+        return { success: false, message: err.message || 'Could not clear audit logs.' };
+      }
     }
   }
 
