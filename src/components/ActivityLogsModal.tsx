@@ -31,7 +31,12 @@ import {
   X
 } from 'lucide-react';
 import { ActivityAction, ActivityEntityType, ActivityLog, UserProfile, UserRole } from '../types';
-import { fetchActivityLogs, loadLocalActivityLogs } from '../utils/supabaseStorage';
+import {
+  clearActivityLogsFromCloud,
+  deleteActivityLogFromCloud,
+  fetchActivityLogs,
+  loadLocalActivityLogs
+} from '../utils/supabaseStorage';
 import { isSupabaseConfigured } from '../lib/supabase';
 
 interface ActivityLogsModalProps {
@@ -53,6 +58,15 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const isAdmin = isSupabaseConfigured()
+    ? currentUser?.role === 'ADMIN'
+    : !currentUser || currentUser.role === 'ADMIN';
 
   const loadLogs = async () => {
     setIsLoading(true);
@@ -71,6 +85,9 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
     if (isOpen) {
       loadLogs();
       setExpandedLogId(null);
+      setPendingDeleteId(null);
+      setShowClearConfirm(false);
+      setActionError(null);
     }
   }, [isOpen]);
 
@@ -86,9 +103,36 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
       }
     };
 
+    const handleIdSynced = (e: any) => {
+      const detail = e.detail as { tempId: string; syncedEntry: ActivityLog } | undefined;
+      if (detail?.tempId && detail?.syncedEntry) {
+        setLogs(prev =>
+          prev.map(l => (l.id === detail.tempId ? detail.syncedEntry : l))
+        );
+      }
+    };
+
+    const handleRemoteUpdate = () => {
+      if (isOpen) {
+        loadLogs();
+      }
+    };
+
     window.addEventListener('voya_activity_logged', handleNewLog);
-    return () => window.removeEventListener('voya_activity_logged', handleNewLog);
-  }, []);
+    window.addEventListener('voya_activity_id_synced', handleIdSynced);
+    window.addEventListener('voya_activity_logs_updated', handleRemoteUpdate);
+    return () => {
+      window.removeEventListener('voya_activity_logged', handleNewLog);
+      window.removeEventListener('voya_activity_id_synced', handleIdSynced);
+      window.removeEventListener('voya_activity_logs_updated', handleRemoteUpdate);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!pendingDeleteId) return;
+    const timer = window.setTimeout(() => setPendingDeleteId(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [pendingDeleteId]);
 
   const formatRelativeTime = (isoString: string): string => {
     try {
@@ -265,6 +309,71 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
     showToast('Activity & audit log exported as CSV.');
   };
 
+  const hasActiveFilter =
+    Boolean(searchQuery.trim()) || selectedCategory !== 'all' || selectedRole !== 'all';
+
+  const handleDeleteSingleLog = async (id: string) => {
+    if (!isAdmin) {
+      showToast('Permission denied: Only administrators can delete audit logs.');
+      return;
+    }
+
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      return;
+    }
+
+    setActionError(null);
+    setDeletingId(id);
+    try {
+      const res = await deleteActivityLogFromCloud(id);
+      if (!res.success) {
+        setActionError(res.message);
+        showToast(res.message);
+        return;
+      }
+      setLogs(prev => prev.filter(l => l.id !== id));
+      if (expandedLogId === id) setExpandedLogId(null);
+      setPendingDeleteId(null);
+      showToast(res.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleConfirmClearLogs = async () => {
+    if (!isAdmin) {
+      showToast('Permission denied: Only administrators can delete audit logs.');
+      return;
+    }
+
+    if (filteredLogs.length === 0) return;
+
+    setActionError(null);
+    setIsClearing(true);
+    try {
+      const targetIds = hasActiveFilter ? filteredLogs.map(l => l.id) : undefined;
+      const res = await clearActivityLogsFromCloud(targetIds);
+      if (!res.success) {
+        setActionError(res.message);
+        showToast(res.message);
+        return;
+      }
+
+      if (targetIds) {
+        const deletedSet = new Set(targetIds);
+        setLogs(prev => prev.filter(l => !deletedSet.has(l.id)));
+      } else {
+        setLogs([]);
+      }
+      setExpandedLogId(null);
+      setShowClearConfirm(false);
+      showToast(res.message);
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -281,8 +390,14 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
                 <h3 className="text-base font-bold text-slate-100">
                   User Activity &amp; Audit Logs
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                  Tamper-Proof
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    isAdmin
+                      ? 'bg-amber-950/70 text-amber-300 border-amber-800/70'
+                      : 'bg-slate-800 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  {isAdmin ? 'Admin Controls' : 'View Only'}
                 </span>
                 {isSupabaseConfigured() && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-700 text-emerald-300">
@@ -297,7 +412,33 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {isAdmin && filteredLogs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActionError(null);
+                  setShowClearConfirm(prev => !prev);
+                }}
+                disabled={isClearing || isLoading}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap ${
+                  showClearConfirm
+                    ? 'border-rose-500 bg-rose-950/80 text-rose-200'
+                    : 'border-rose-800/70 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300'
+                }`}
+                title={
+                  hasActiveFilter
+                    ? `Delete ${filteredLogs.length} filtered audit log(s) (Admin only)`
+                    : 'Clear all audit logs (Admin only)'
+                }
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>
+                  {hasActiveFilter ? `Delete Filtered (${filteredLogs.length})` : 'Clear Logs'}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors cursor-pointer"
@@ -324,6 +465,59 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Inline Clear Confirmation Banner (Admin only) */}
+        {isAdmin && showClearConfirm && filteredLogs.length > 0 && (
+          <div className="px-4 py-2.5 bg-rose-950/70 border-b border-rose-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs text-rose-200">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>
+                {hasActiveFilter
+                  ? `Permanently delete ${filteredLogs.length} filtered audit log entry(s)?`
+                  : `Permanently clear all ${logs.length} audit log entries? This cannot be undone.`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                disabled={isClearing}
+                className="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearLogs}
+                disabled={isClearing}
+                className="px-3 py-1 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isClearing
+                  ? 'Deleting...'
+                  : hasActiveFilter
+                  ? `Delete ${filteredLogs.length} Logs`
+                  : 'Yes, Clear All Logs'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Inline Action Error Banner */}
+        {actionError && (
+          <div className="px-4 py-2 bg-rose-950/60 border-b border-rose-800/70 flex items-center justify-between gap-2 text-xs text-rose-200">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="text-rose-300 hover:text-white p-0.5 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Toolbar: Search, Category Tabs, Role Filter */}
         <div className="p-3 sm:p-4 bg-slate-900/90 border-b border-slate-800 space-y-3">
@@ -476,14 +670,39 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Timestamp & Expand Details */}
-                    <div className="flex items-center sm:flex-col sm:items-end justify-between sm:justify-center gap-1 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
-                      <div
-                        className="flex items-center gap-1 text-[11px] text-slate-400 font-mono"
-                        title={formatFullDate(log.created_at)}
-                      >
-                        <Clock className="w-3 h-3 text-slate-500" />
-                        <span>{formatRelativeTime(log.created_at)}</span>
+                    {/* Timestamp, Expand Details & Admin Delete */}
+                    <div className="flex items-center sm:flex-col sm:items-end justify-between sm:justify-center gap-1.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/60">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="flex items-center gap-1 text-[11px] text-slate-400 font-mono"
+                          title={formatFullDate(log.created_at)}
+                        >
+                          <Clock className="w-3 h-3 text-slate-500" />
+                          <span>{formatRelativeTime(log.created_at)}</span>
+                        </div>
+
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSingleLog(log.id)}
+                            disabled={deletingId === log.id}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer disabled:opacity-50 ${
+                              pendingDeleteId === log.id
+                                ? 'border-rose-500 bg-rose-600 text-white'
+                                : 'border-slate-800 bg-slate-900 hover:border-rose-800/80 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300'
+                            }`}
+                            title={
+                              pendingDeleteId === log.id
+                                ? 'Click again to confirm permanent deletion'
+                                : 'Delete audit log (Admin only)'
+                            }
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            {pendingDeleteId === log.id && (
+                              <span>{deletingId === log.id ? '...' : 'Confirm'}</span>
+                            )}
+                          </button>
+                        )}
                       </div>
 
                       {hasDetails && (
@@ -551,7 +770,9 @@ export const ActivityLogsModal: React.FC<ActivityLogsModalProps> = ({
           </div>
 
           <p className="text-[11px] text-slate-500 text-center sm:text-right">
-            Append-only legal audit log enforced by Supabase Row Level Security.
+            {isAdmin
+              ? 'Administrator access enabled: you can export or delete audit log entries.'
+              : 'View-only access: only administrators can delete audit log entries.'}
           </p>
         </div>
       </div>

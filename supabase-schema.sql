@@ -402,8 +402,13 @@ create policy "Authenticated users can append activity logs"
   on public.activity_logs for insert
   with check (auth.role() = 'authenticated');
 
--- NOTE: No UPDATE or DELETE policies are granted on public.activity_logs,
--- guaranteeing append-only tamper-proof audit trails for legal and regulatory compliance.
+-- Only Administrators can delete activity logs (Staff have read-only access)
+create policy "Only Admins can delete audit logs"
+  on public.activity_logs for delete
+  using (public.is_admin());
+
+-- NOTE: No UPDATE policy is granted on public.activity_logs;
+-- Staff can view and append activity logs, and only Administrators can delete entries.
 
 -- Enable Realtime publication for tables
 alter publication supabase_realtime add table public.quotations;

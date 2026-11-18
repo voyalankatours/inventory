@@ -491,6 +491,9 @@ export default function App() {
           setHotelRateCards(resolvedCards);
           saveHotelRatesToLocal(resolvedCards);
         }
+      },
+      onActivityLogsChange: () => {
+        window.dispatchEvent(new CustomEvent('voya_activity_logs_updated'));
       }
     });
 
