@@ -118,11 +118,31 @@ export function saveCompanyDetails(details: CompanyDetails): void {
   }
 }
 
+export function isValidLogoSource(src: unknown): src is string {
+  if (typeof src !== 'string') return false;
+  const trimmed = src.trim();
+  if (!trimmed) return false;
+  return (
+    /^data:image\/[a-z0-9.+-]+;base64,/i.test(trimmed) ||
+    /^data:image\/svg\+xml/i.test(trimmed) ||
+    /^https?:\/\//i.test(trimmed) ||
+    trimmed.startsWith('/')
+  );
+}
+
 export function loadLogo(): LogoData | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOGO);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (parsed && isValidLogoSource(parsed.data)) {
+      return {
+        data: parsed.data,
+        w: Number(parsed.w) || 200,
+        h: Number(parsed.h) || 80
+      };
+    }
+    return null;
   } catch (err) {
     console.error('Failed to load logo:', err);
     return null;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Calendar,
@@ -44,6 +44,12 @@ export const OnlineProposalView: React.FC<OnlineProposalViewProps> = ({
   const b = data.breakdown;
   const comp = data.company;
   const resolvedLogoUrl = data.logoUrl || fallbackLogo?.data;
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [resolvedLogoUrl]);
+
   const totalNights = Math.max(0, p.days - 1);
   const totalPax = p.adults + p.child12 + p.child5;
 
@@ -168,23 +174,24 @@ export const OnlineProposalView: React.FC<OnlineProposalViewProps> = ({
                 <span className="hidden sm:inline">Editor Workspace</span>
               </button>
             )}
-            <div className="flex items-center gap-2.5">
-              {resolvedLogoUrl ? (
+            <div className="flex items-center gap-2.5 shrink-0">
+              {resolvedLogoUrl && !logoError ? (
                 <img
                   src={resolvedLogoUrl}
                   alt="Voya Lanka Tours (Pvt) Ltd."
-                  className="h-11 w-auto max-w-[140px] object-contain rounded bg-white p-1 -mt-0.5 shadow-sm"
+                  onError={() => setLogoError(true)}
+                  className="h-11 w-auto max-w-[140px] object-contain rounded bg-white p-1 shadow-sm shrink-0"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-sky-600 to-teal-500 flex items-center justify-center text-white -mt-0.5">
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-sky-600 to-teal-500 flex items-center justify-center text-white shrink-0">
                   <Plane className="w-4 h-4 -rotate-45" />
                 </div>
               )}
-              <div>
-                <span className="text-xs sm:text-sm font-bold text-slate-100 block leading-tight">
+              <div className="shrink-0">
+                <span className="text-xs sm:text-sm font-bold text-slate-100 block leading-tight whitespace-nowrap">
                   Voya Lanka Tours (Pvt) Ltd.
                 </span>
-                <span className="text-[9px] text-amber-400 italic font-medium uppercase tracking-wider block mt-0.5 leading-tight">
+                <span className="text-[10px] text-amber-400 italic font-medium uppercase tracking-wider block mt-0.5 leading-tight whitespace-nowrap">
                   MORE THAN A DESTINATION
                 </span>
               </div>

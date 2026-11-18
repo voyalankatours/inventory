@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Printer, X } from 'lucide-react';
 import {
   CompanyDetails,
@@ -47,6 +47,12 @@ export const PrintModal: React.FC<PrintModalProps> = ({
   onClose,
   onTriggerPrint
 }) => {
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [logo?.data]);
+
   if (!isOpen) return null;
 
   const days = Math.max(1, pax.days || 1);
@@ -84,18 +90,19 @@ export const PrintModal: React.FC<PrintModalProps> = ({
             {/* Document Header */}
             <div className="flex justify-between items-start border-b-2 border-sky-600 pb-4">
               <div className="flex items-center gap-4">
-                {logo && logo.data && (
+                {logo && logo.data && !logoError && (
                   <img
                     src={logo.data}
-                    alt="Logo"
-                    className="h-16 w-auto max-w-[160px] object-contain -mt-2"
+                    alt="Voya Lanka Tours (Pvt) Ltd."
+                    onError={() => setLogoError(true)}
+                    className="h-16 w-auto max-w-[160px] object-contain shrink-0"
                   />
                 )}
-                <div>
-                  <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">
+                <div className="shrink-0">
+                  <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none whitespace-nowrap">
                     VOYA LANKA TOURS (PVT) LTD.
                   </h1>
-                  <p className="text-[9px] text-amber-700 italic font-medium tracking-wider mt-1 uppercase">
+                  <p className="text-[9px] text-amber-700 italic font-medium tracking-wider mt-1 uppercase whitespace-nowrap">
                     MORE THAN A DESTINATION
                   </p>
                   <p className="text-[10px] text-slate-500 font-semibold tracking-wider mt-0.5">

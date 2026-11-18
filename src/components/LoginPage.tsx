@@ -39,6 +39,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [isResetMode, setIsResetMode] = useState(false);
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [logo?.data]);
 
   const isConfigured = isSupabaseConfigured();
 
@@ -189,23 +194,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       {/* Top Header Bar */}
       <header className="relative z-10 px-6 py-4 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {logo && logo.data ? (
+        <div className="flex items-center gap-3 shrink-0">
+          {logo && logo.data && !logoError ? (
             <img
               src={logo.data}
-              alt="Voya Lanka Tours"
-              className="h-11 w-auto max-w-[140px] object-contain rounded-lg bg-white p-1 shadow-sm"
+              alt="Voya Lanka Tours (Pvt) Ltd."
+              onError={() => setLogoError(true)}
+              className="h-11 w-auto max-w-[140px] object-contain rounded-lg bg-white p-1 shadow-sm shrink-0"
             />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-700 to-teal-600 flex items-center justify-center text-white shadow-md shadow-sky-900/40">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-700 to-teal-600 flex items-center justify-center text-white shadow-md shadow-sky-900/40 shrink-0">
               <Plane className="w-5 h-5 -rotate-45" />
             </div>
           )}
-          <div>
-            <h1 className="text-sm font-bold text-slate-100 leading-tight">
+          <div className="shrink-0">
+            <h1 className="text-sm font-bold text-slate-100 leading-tight whitespace-nowrap">
               Voya Lanka Tours (Pvt) Ltd.
             </h1>
-            <p className="text-[9px] font-medium italic tracking-wider text-amber-400 uppercase leading-tight">
+            <p className="text-[10px] font-medium italic tracking-wider text-amber-400 uppercase leading-tight whitespace-nowrap">
               MORE THAN A DESTINATION
             </p>
           </div>

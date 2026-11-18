@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Building2,
   Cloud,
@@ -90,6 +90,11 @@ export const Header: React.FC<HeaderProps> = ({
   onLogoRemove
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logoLoadError, setLogoLoadError] = useState(false);
+
+  useEffect(() => {
+    setLogoLoadError(false);
+  }, [logo?.data]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,27 +133,28 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-slate-950 border-b border-slate-800 sticky top-0 z-40 py-2.5">
-      <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {/* Brand Zone */}
-        <div className="flex items-center justify-between md:justify-start gap-4 w-full md:w-auto">
-          <div className="flex items-center gap-3">
-            {logo && logo.data ? (
+        <div className="flex items-center justify-between md:justify-start gap-4 w-full lg:w-auto shrink-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-3 shrink-0">
+            {logo && logo.data && !logoLoadError ? (
               <img
                 src={logo.data}
-                alt="Company logo"
-                className="h-14 w-auto max-w-[155px] object-contain rounded-lg bg-white p-1 shadow-sm -mt-0.5"
+                alt="Voya Lanka Tours (Pvt) Ltd."
+                onError={() => setLogoLoadError(true)}
+                className="h-11 sm:h-12 w-auto max-w-[150px] object-contain rounded-lg bg-white p-1 shadow-sm shrink-0"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-sky-700 to-teal-600 flex items-center justify-center text-white shadow-md shadow-sky-900/40 -mt-0.5">
-                <Plane className="w-6 h-6 -rotate-45" />
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-sky-700 to-teal-600 flex items-center justify-center text-white shadow-md shadow-sky-900/40 shrink-0">
+                <Plane className="w-5 h-5 -rotate-45" />
               </div>
             )}
-            <div className="flex flex-col">
-              <h1 className="text-sm sm:text-base font-bold leading-tight tracking-tight text-slate-100">
-                Voya Lanka<br />Tours (Pvt) Ltd.
+            <div className="flex flex-col shrink-0">
+              <h1 className="text-sm sm:text-base font-bold leading-tight tracking-tight text-slate-100 whitespace-nowrap">
+                Voya Lanka Tours (Pvt) Ltd.
               </h1>
-              <p className="text-[9px] font-medium italic tracking-wider text-amber-400 uppercase mt-0.5 leading-tight">
-                MORE THAN A<br />DESTINATION
+              <p className="text-[10px] font-medium italic tracking-wider text-amber-400 uppercase mt-0.5 leading-tight whitespace-nowrap">
+                MORE THAN A DESTINATION
               </p>
             </div>
           </div>
@@ -224,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Action Controls - Two Rows matching reference */}
-        <div className="flex flex-col items-start md:items-end gap-2">
+        <div className="flex flex-col items-start lg:items-end gap-2">
           {/* Top Row: Itinerary, Saved, Customers, Share Proposal, Backup & Restore, Demo, Reset, Logo */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <button

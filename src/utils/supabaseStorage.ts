@@ -329,18 +329,39 @@ export async function fetchCompanySettings(): Promise<SharedCompanySettings> {
     let logo: LogoData | null = null;
     if (data.logo_data) {
       try {
-        const parsed = typeof data.logo_data === 'string' && data.logo_data.trim().startsWith('{')
-          ? JSON.parse(data.logo_data)
-          : { data: data.logo_data, w: 200, h: 80 };
-        if (parsed && parsed.data) {
+        let current: any = data.logo_data;
+        for (let depth = 0; depth < 2 && typeof current === 'string'; depth++) {
+          const trimmed = current.trim();
+          if (trimmed.startsWith('{') || trimmed.startsWith('"')) {
+            current = JSON.parse(trimmed);
+          } else {
+            break;
+          }
+        }
+        const candidateSrc =
+          typeof current === 'string'
+            ? current
+            : current && typeof current === 'object' && typeof current.data === 'string'
+              ? current.data
+              : '';
+        const trimmedSrc = candidateSrc.trim();
+        const isValidSrc =
+          /^data:image\/[a-z0-9.+-]+;base64,/i.test(trimmedSrc) ||
+          /^data:image\/svg\+xml/i.test(trimmedSrc) ||
+          /^https?:\/\//i.test(trimmedSrc) ||
+          trimmedSrc.startsWith('/');
+        if (isValidSrc) {
           logo = {
-            data: parsed.data,
-            w: Number(parsed.w) || 200,
-            h: Number(parsed.h) || 80
+            data: trimmedSrc,
+            w: Number(current?.w) || 200,
+            h: Number(current?.h) || 80
           };
         }
       } catch (_) {
-        logo = { data: String(data.logo_data), w: 200, h: 80 };
+        const rawStr = String(data.logo_data).trim();
+        if (/^(data:image\/|https?:\/\/|\/)/i.test(rawStr)) {
+          logo = { data: rawStr, w: 200, h: 80 };
+        }
       }
     }
 
